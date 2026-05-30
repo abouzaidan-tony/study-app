@@ -95,15 +95,18 @@ class WordRenderer {
 class VerseRenderer {
   final int verse;
   int readingCount;
+  bool isBookmarked;
   Rect? verseNumberRect;
   Rect? readingCheckboxRect;
   TextPainter verseNumberPainter;
   TextPainter? verseReadingCountPainter;
   Size? checkboxSize;
   List<WordRenderer> words;
+  List<Rect> highlightRects;
 
-  VerseRenderer(this.verse, this.verseNumberPainter)
+  VerseRenderer(this.verse, this.isBookmarked, this.verseNumberPainter)
     : words = [],
+      highlightRects = [],
       readingCount = 0;
 }
 
@@ -140,6 +143,7 @@ class HebrewGreekText extends LeafRenderObjectWidget {
     this.flashColor,
     this.highlightedVerse,
     this.highlightColor,
+    this.bookmarkColor,
     required this.verseLayout,
     required this.readingModeEnabled,
     this.checkedVerses,
@@ -147,6 +151,7 @@ class HebrewGreekText extends LeafRenderObjectWidget {
     this.resetCheckedVerses = false,
     this.checkedVersesRevision = 0,
     this.spotlightVerse,
+    this.bookmarkedVerses = const {},
   });
 
   /// The words that will rendered in the text layout
@@ -202,6 +207,9 @@ class HebrewGreekText extends LeafRenderObjectWidget {
   /// The background color to use for a highlighted verse
   final Color? highlightColor;
 
+  /// The background color to use for a bookmarked verse
+  final Color? bookmarkColor;
+
   /// The verse layout to use for the text
   final VerseLayout verseLayout;
 
@@ -215,6 +223,7 @@ class HebrewGreekText extends LeafRenderObjectWidget {
   final bool resetCheckedVerses;
   final int checkedVersesRevision;
   final int? spotlightVerse;
+  final Set<int> bookmarkedVerses;
 
   @override
   RenderHebrewGreekText createRenderObject(BuildContext context) {
@@ -254,6 +263,7 @@ class HebrewGreekText extends LeafRenderObjectWidget {
       resetCheckedVerses: resetCheckedVerses,
       checkedVersesRevision: checkedVersesRevision,
       spotlightVerse: spotlightVerse,
+      bookmarkedVerses: bookmarkedVerses,
       flashColor:
           flashColor ??
           effectiveVerseNumberStyle?.color?.withValues(alpha: 0.4) ??
@@ -262,6 +272,10 @@ class HebrewGreekText extends LeafRenderObjectWidget {
       highlightColor:
           highlightColor ??
           effectiveVerseNumberStyle?.color?.withValues(alpha: 0.4) ??
+          const Color(0xFFFFFFFF),
+      bookmarkColor:
+          bookmarkColor ??
+          effectiveVerseNumberStyle?.color?.withValues(alpha: 0.5) ??
           const Color(0xFFFFFFFF),
       primaryColor: Theme.of(context).colorScheme.primary,
     );
@@ -320,7 +334,11 @@ class HebrewGreekText extends LeafRenderObjectWidget {
           highlightColor ??
           effectiveVerseNumberStyle?.color?.withValues(alpha: 0.4) ??
           const Color(0xFFFFFFFF)
-      ..primaryColor = Theme.of(context).colorScheme.primary;
+      ..primaryColor = Theme.of(context).colorScheme.primary
+      ..bookmarkColor =
+          bookmarkColor ??
+          effectiveVerseNumberStyle?.color?.withValues(alpha: 0.5) ??
+          const Color(0xFFFFFFFF);
   }
 
   @override
@@ -392,6 +410,7 @@ class RenderHebrewGreekText extends RenderBox {
     required Color flashColor,
     int? highlightedVerse,
     Color? highlightColor,
+    Color? bookmarkColor,
     required VerseLayout verseLayout,
     required bool readingModeEnabled,
     Map<int, int>? checkedVerses,
@@ -399,6 +418,7 @@ class RenderHebrewGreekText extends RenderBox {
     bool resetCheckedVerses = false,
     int checkedVersesRevision = 0,
     int? spotlightVerse,
+    required Set<int> bookmarkedVerses,
     required Color primaryColor,
   }) : _words = words,
        _verses = _buildBlocks(words),
@@ -417,8 +437,10 @@ class RenderHebrewGreekText extends RenderBox {
        _flashColor = flashColor,
        _highlightedVerse = highlightedVerse,
        _highlightColor = highlightColor,
+       _bookmarkColor = bookmarkColor,
        _verseLayout = verseLayout,
        _readingModeEnabled = readingModeEnabled,
+       _bookmarkedVerses = bookmarkedVerses,
        _checkedVerses = checkedVerses == null
            ? null
            : Map<int, int>.unmodifiable(checkedVerses),
@@ -696,6 +718,23 @@ class RenderHebrewGreekText extends RenderBox {
     markNeedsPaint();
   }
 
+  Color? _bookmarkColor;
+  Color? get bookmarkColor => _bookmarkColor;
+  set bookmarkColor(Color? value) {
+    if (_bookmarkColor == value) return;
+    _bookmarkColor = value;
+    markNeedsPaint();
+  }
+
+  Set<int> _bookmarkedVerses;
+  Set<int> get bookmarkedVerses => _bookmarkedVerses;
+  set bookmarkedVerses(Set<int> verses) {
+    if (setEquals(_bookmarkedVerses, verses)) return;
+    _bookmarkedVerses = verses;
+    _needsResetVersesRenderers = true;
+    markNeedsLayout();
+  }
+
   /// Clears all popup state and requests a repaint to make it disappear.
   void _dismissPopup() {
     _popupDismissTimer?.cancel();
@@ -795,7 +834,11 @@ class RenderHebrewGreekText extends RenderBox {
         textDirection: _textDirection,
       )..layout();
 
-      final verseRenderer = VerseRenderer(verse.verse, verseNumberPainter);
+      final verseRenderer = VerseRenderer(
+        verse.verse,
+        _bookmarkedVerses.contains(verse.verse),
+        verseNumberPainter,
+      );
 
       _verseRenderer.add(verseRenderer);
 
@@ -862,6 +905,8 @@ class RenderHebrewGreekText extends RenderBox {
         word.painter.text = TextSpan(text: word.word.text, style: _textStyle);
         word.painter.layout();
       }
+
+      verseRenderer.highlightRects.clear();
 
       verseRenderer.verseNumberPainter.text = TextSpan(
         text: '${verseRenderer.verse}',
@@ -987,6 +1032,9 @@ class RenderHebrewGreekText extends RenderBox {
     final Map<int, Rect> verseRectsMap = {};
     Rect? spotlightRect;
 
+    double? top, left;
+    double? bottom, right;
+
     for (int i = 0; i < _verseRenderer.length; i++) {
       VerseRenderer verse = _verseRenderer[i];
 
@@ -1011,6 +1059,38 @@ class RenderHebrewGreekText extends RenderBox {
           j == 0 ? verse.checkboxSize : null,
         );
 
+        if (verse.isBookmarked) {
+          //new line started, add save previous line
+          if (currentLineWordIds.length == 1 || top == null) {
+            if (top != null) {
+              verse.highlightRects.add(
+                Rect.fromLTRB(left!, top, right!, bottom!),
+              );
+            }
+
+            Rect r;
+            if (j == 0) {
+              r = verse.verseNumberRect!;
+            } else {
+              r = verse.words[j].rect!;
+            }
+
+            top = r.top;
+            if (isLtr) {
+              left = r.left;
+            } else {
+              right = r.right;
+            }
+          }
+
+          bottom = verse.words[j].rect!.bottom;
+          if (isLtr) {
+            right = verse.words[j].rect!.right;
+          } else {
+            left = verse.words[j].rect!.left;
+          }
+        }
+
         // Track the maximum width used.
         if (isLtr) {
           maxLineWidth = math.max(
@@ -1023,6 +1103,11 @@ class RenderHebrewGreekText extends RenderBox {
             availableWidth - (mainAxisOffset + effectiveSpaceWidth),
           );
         }
+      }
+
+      if (top != null) {
+        verse.highlightRects.add(Rect.fromLTRB(left!, top, right!, bottom!));
+        top = null;
       }
 
       if (_spotlightVerse != null &&
@@ -1040,6 +1125,12 @@ class RenderHebrewGreekText extends RenderBox {
       crossAxisOffset + currentLineMaxHeight,
       currentLineWordIds,
     );
+
+    if (top != null) {
+      _verseRenderer[_verseRenderer.length - 1].highlightRects.add(
+        Rect.fromLTRB(left!, top, right!, bottom!),
+      );
+    }
 
     controller?._updateVerseRects(verseRectsMap);
 
@@ -1630,6 +1721,22 @@ class RenderHebrewGreekText extends RenderBox {
       //paint the checkbox for the reading session
       if (verse.verseReadingCountPainter != null) {
         _paintCheckboxes(canvas, verse);
+      }
+
+      if (_bookmarkColor != null && verse.highlightRects.isNotEmpty) {
+        final bookmarkPath = Path();
+        final paint = Paint()..color = _bookmarkColor!;
+        for (Rect r in verse.highlightRects) {
+          final displayRect = r.inflate(-0.2);
+          final rrect = RRect.fromRectAndRadius(
+            displayRect,
+            const Radius.circular(4.0),
+          );
+
+          bookmarkPath.addRRect(rrect);
+        }
+
+        canvas.drawPath(bookmarkPath, paint);
       }
 
       // 2.1 Paint the verse number

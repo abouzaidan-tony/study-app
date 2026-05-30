@@ -3,6 +3,7 @@ import 'package:just_audio_background/just_audio_background.dart';
 import 'package:studyapp/l10n/app_localizations.dart';
 import 'package:studyapp/services/audio/audio_database.dart';
 import 'package:studyapp/services/bible/bible_service.dart';
+import 'package:studyapp/services/bookmarks/bookmark_database.dart';
 import 'package:studyapp/services/gloss/gloss_service.dart';
 import 'package:studyapp/services/hebrew_greek/database.dart';
 import 'package:studyapp/services/lexicon/database.dart';
@@ -25,6 +26,7 @@ Future<void> main() async {
   await getIt<BibleService>().init();
   await getIt<AudioDatabase>().init();
   await getIt<ReadingSessionDatabase>().init();
+  await getIt<BookmarksDatabase>().init();
   await JustAudioBackground.init(
     androidNotificationChannelId: 'com.ryanheise.bg_demo.channel.audio',
     androidNotificationChannelName: 'Audio playback',

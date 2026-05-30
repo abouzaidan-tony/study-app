@@ -70,6 +70,8 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
       manager.loadReadVerses(widget.bookId, widget.chapter);
     }
 
+    manager.loadBookmarkedVerses(widget.bookId, widget.chapter);
+
     _textController.setSpotlightUpdatedCalllback(
       _reportReadingCheckboxGuideRect,
     );
@@ -86,6 +88,8 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
       if (widget.readingModeEnabled) {
         manager.loadReadVerses(widget.bookId, widget.chapter);
       }
+
+      manager.loadBookmarkedVerses(widget.bookId, widget.chapter);
     } else if (widget.readingModeEnabled && !oldWidget.readingModeEnabled) {
       manager.loadReadVerses(widget.bookId, widget.chapter);
     }
@@ -153,12 +157,16 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: manager.verseCheckboxNotifier,
+      listenable: Listenable.merge([
+        manager.verseCheckboxNotifier,
+        manager.bookmarkedVerses,
+      ]),
       builder: (context, child) {
         final checkedVerses = manager.verseCheckboxNotifier.value;
         final changedVerse = manager.verseCheckboxNotifier.changedVerse;
         final resetCheckedVerses = manager.verseCheckboxNotifier.resetAll;
         final checkedVersesRevision = manager.verseCheckboxNotifier.revision;
+        final bookmarkedVerses = manager.bookmarkedVerses.value;
         return ValueListenableBuilder<List<HebrewGreekWord>>(
           valueListenable: manager.textNotifier,
           builder: (context, words, child) {
@@ -200,6 +208,7 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
                         resetCheckedVerses: resetCheckedVerses,
                         checkedVersesRevision: checkedVersesRevision,
                         spotlightVerse: spotlightVerse,
+                        bookmarkedVerses: bookmarkedVerses,
                         controller: _textController,
                         textDirection: manager.isRtl(widget.bookId)
                             ? TextDirection.rtl
@@ -262,6 +271,9 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
                         highlightColor: Theme.of(
                           context,
                         ).colorScheme.primary.withValues(alpha: 0.25),
+                        bookmarkColor: Theme.of(
+                          context,
+                        ).colorScheme.primary.withValues(alpha: 0.4),
                       ),
                     ],
                   ),

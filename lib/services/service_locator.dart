@@ -1,6 +1,7 @@
 import 'package:get_it/get_it.dart';
 import 'package:studyapp/app_state.dart';
 import 'package:studyapp/services/app_guide/app_guide_manager.dart';
+import 'package:studyapp/services/bookmarks/bookmark_database.dart';
 import 'package:studyapp/services/reading_session/rs_database.dart';
 import 'package:studyapp/services/reading_session/rs_manager.dart';
 import 'package:studyapp/services/resources/remote_asset_service.dart';
@@ -34,4 +35,5 @@ void setupServiceLocator() {
   );
   getIt.registerSingleton<ReadingSessionManager>(ReadingSessionManager());
   getIt.registerSingleton<AppGuideManager>(AppGuideManager());
+  getIt.registerLazySingleton<BookmarksDatabase>(() => BookmarksDatabase());
 }

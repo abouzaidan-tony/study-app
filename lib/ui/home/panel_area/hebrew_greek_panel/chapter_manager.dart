@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:studyapp/app_state.dart';
 import 'package:studyapp/common/word.dart';
 import 'package:studyapp/services/bible/bible_service.dart';
+import 'package:studyapp/services/bookmarks/bookmark_database.dart';
+import 'package:studyapp/services/bookmarks/bookmark_model.dart';
 import 'package:studyapp/services/download/cancel_token.dart';
 import 'package:studyapp/services/gloss/gloss_service.dart';
 import 'package:studyapp/services/hebrew_greek/database.dart';
@@ -15,9 +17,11 @@ class HebrewGreekChapterManager {
   final _bibleService = getIt<BibleService>();
   final _settings = getIt<UserSettings>();
   final _rsmanager = getIt<ReadingSessionManager>();
+  final _bookmarkDb = getIt<BookmarksDatabase>();
 
   final textNotifier = _SafeValueNotifier<List<HebrewGreekWord>>([]);
   final verseCheckboxNotifier = VerseCheckboxNotifier();
+  final bookmarkedVerses = _SafeValueNotifier<Set<int>>({});
   bool _disposed = false;
   int _chapterLoadToken = 0;
   int _readVersesLoadToken = 0;
@@ -41,6 +45,19 @@ class HebrewGreekChapterManager {
     );
     if (_disposed || token != _readVersesLoadToken) return;
     verseCheckboxNotifier.setVersesRead(versesRead);
+  }
+
+  Future<void> loadBookmarkedVerses(int bookId, int chapter) async {
+    if (_disposed) return;
+    final bookmarks = await _bookmarkDb.getBookmarksFor(bookId, chapter);
+    Set<int> bookmarkVerses = {};
+    for (Bookmark b in bookmarks) {
+      for (int i = b.fromVerse; i <= b.toVerse; i++) {
+        bookmarkVerses.add(i);
+      }
+    }
+    if (_disposed) return;
+    bookmarkedVerses.value = bookmarkVerses;
   }
 
   Future<void> markVerseAsRead(int bookId, int chapter, int verse) async {

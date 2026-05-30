@@ -4,7 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:studyapp/l10n/app_localizations.dart';
-import 'package:studyapp/services/reading_session/rs_database.dart';
+import 'package:studyapp/services/common/abstract_database.dart';
 import 'package:studyapp/services/reading_session/rs_manager.dart';
 import 'package:studyapp/services/service_locator.dart';
 
@@ -18,7 +18,7 @@ class BackupRestorePage extends StatefulWidget {
 class _BackupRestoreState extends State<BackupRestorePage> {
   final _readingSessionManager = getIt<ReadingSessionManager>();
   PackageInfo? _packageInfo;
-  List<ReadingSessionBackupInfo> _backups = [];
+  List<DatabaseBackupInfo> _backups = [];
   bool _busy = false;
 
   @override
@@ -136,7 +136,7 @@ class _BackupRestoreState extends State<BackupRestorePage> {
     }
   }
 
-  Future<void> _restoreBackup(ReadingSessionBackupInfo backup) async {
+  Future<void> _restoreBackup(DatabaseBackupInfo backup) async {
     final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,

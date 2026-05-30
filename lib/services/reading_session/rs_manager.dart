@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:studyapp/common/bible_navigation.dart';
+import 'package:studyapp/services/common/abstract_database.dart';
 import 'package:studyapp/services/reading_session/rs_database.dart';
 import 'package:studyapp/services/reading_session/rs_model.dart';
 import 'package:studyapp/services/service_locator.dart';
@@ -332,7 +333,7 @@ class ReadingSessionManager {
     return _rsdbManager.buildBackupBytes();
   }
 
-  Future<List<ReadingSessionBackupInfo>> listBackups() async {
+  Future<List<DatabaseBackupInfo>> listBackups() async {
     return _rsdbManager.listBackups();
   }
 
