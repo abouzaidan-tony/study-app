@@ -81,8 +81,15 @@ class HebrewGreekTextController {
 //class to group words by verse
 class VerseLayoutBlock {
   final int verse;
+  final int? highlightWordStart;
+  final int? highlightWordEnd;
   final List<HebrewGreekWord> words;
-  VerseLayoutBlock(this.verse, this.words);
+  VerseLayoutBlock(
+    this.verse,
+    this.words,
+    this.highlightWordStart,
+    this.highlightWordEnd,
+  );
 }
 
 class WordRenderer {
@@ -95,17 +102,24 @@ class WordRenderer {
 class VerseRenderer {
   final int verse;
   int readingCount;
-  bool isBookmarked;
+  int? highlightWordStart;
+  int? highlightWordEnd;
   Rect? verseNumberRect;
   Rect? readingCheckboxRect;
+  Rect? bookmarkIconRect;
   TextPainter verseNumberPainter;
   TextPainter? verseReadingCountPainter;
+  TextPainter? bookmarkIconPainter;
   Size? checkboxSize;
   List<WordRenderer> words;
   List<Rect> highlightRects;
 
-  VerseRenderer(this.verse, this.isBookmarked, this.verseNumberPainter)
-    : words = [],
+  VerseRenderer(
+    this.verse,
+    this.verseNumberPainter,
+    this.highlightWordStart,
+    this.highlightWordEnd,
+  ) : words = [],
       highlightRects = [],
       readingCount = 0;
 }
@@ -143,7 +157,7 @@ class HebrewGreekText extends LeafRenderObjectWidget {
     this.flashColor,
     this.highlightedVerse,
     this.highlightColor,
-    this.bookmarkColor,
+    this.userHighlightColor,
     required this.verseLayout,
     required this.readingModeEnabled,
     this.checkedVerses,
@@ -152,6 +166,7 @@ class HebrewGreekText extends LeafRenderObjectWidget {
     this.checkedVersesRevision = 0,
     this.spotlightVerse,
     this.bookmarkedVerses = const {},
+    this.highlightedWords = const [],
   });
 
   /// The words that will rendered in the text layout
@@ -208,7 +223,7 @@ class HebrewGreekText extends LeafRenderObjectWidget {
   final Color? highlightColor;
 
   /// The background color to use for a bookmarked verse
-  final Color? bookmarkColor;
+  final Color? userHighlightColor;
 
   /// The verse layout to use for the text
   final VerseLayout verseLayout;
@@ -224,6 +239,7 @@ class HebrewGreekText extends LeafRenderObjectWidget {
   final int checkedVersesRevision;
   final int? spotlightVerse;
   final Set<int> bookmarkedVerses;
+  final List<(int, int)> highlightedWords;
 
   @override
   RenderHebrewGreekText createRenderObject(BuildContext context) {
@@ -264,6 +280,7 @@ class HebrewGreekText extends LeafRenderObjectWidget {
       checkedVersesRevision: checkedVersesRevision,
       spotlightVerse: spotlightVerse,
       bookmarkedVerses: bookmarkedVerses,
+      highlightedWords: highlightedWords,
       flashColor:
           flashColor ??
           effectiveVerseNumberStyle?.color?.withValues(alpha: 0.4) ??
@@ -273,8 +290,8 @@ class HebrewGreekText extends LeafRenderObjectWidget {
           highlightColor ??
           effectiveVerseNumberStyle?.color?.withValues(alpha: 0.4) ??
           const Color(0xFFFFFFFF),
-      bookmarkColor:
-          bookmarkColor ??
+      userHighlightColor:
+          userHighlightColor ??
           effectiveVerseNumberStyle?.color?.withValues(alpha: 0.5) ??
           const Color(0xFFFFFFFF),
       primaryColor: Theme.of(context).colorScheme.primary,
@@ -324,6 +341,8 @@ class HebrewGreekText extends LeafRenderObjectWidget {
         revision: checkedVersesRevision,
       )
       ..spotlightVerse = spotlightVerse
+      ..bookmarkedVerses = bookmarkedVerses
+      ..highlightedWords = highlightedWords
       ..readingModeEnabled = readingModeEnabled
       ..flashColor =
           flashColor ??
@@ -335,8 +354,8 @@ class HebrewGreekText extends LeafRenderObjectWidget {
           effectiveVerseNumberStyle?.color?.withValues(alpha: 0.4) ??
           const Color(0xFFFFFFFF)
       ..primaryColor = Theme.of(context).colorScheme.primary
-      ..bookmarkColor =
-          bookmarkColor ??
+      ..userHighlightColor =
+          userHighlightColor ??
           effectiveVerseNumberStyle?.color?.withValues(alpha: 0.5) ??
           const Color(0xFFFFFFFF);
   }
@@ -410,7 +429,7 @@ class RenderHebrewGreekText extends RenderBox {
     required Color flashColor,
     int? highlightedVerse,
     Color? highlightColor,
-    Color? bookmarkColor,
+    Color? userHighlightColor,
     required VerseLayout verseLayout,
     required bool readingModeEnabled,
     Map<int, int>? checkedVerses,
@@ -419,9 +438,10 @@ class RenderHebrewGreekText extends RenderBox {
     int checkedVersesRevision = 0,
     int? spotlightVerse,
     required Set<int> bookmarkedVerses,
+    required List<(int, int)> highlightedWords,
     required Color primaryColor,
   }) : _words = words,
-       _verses = _buildBlocks(words),
+       _verses = _buildBlocks(words, highlightedWords),
        _controller = controller,
        _textDirection = textDirection,
        _textStyle = style,
@@ -437,10 +457,11 @@ class RenderHebrewGreekText extends RenderBox {
        _flashColor = flashColor,
        _highlightedVerse = highlightedVerse,
        _highlightColor = highlightColor,
-       _bookmarkColor = bookmarkColor,
+       _userHighlightColor = userHighlightColor,
        _verseLayout = verseLayout,
        _readingModeEnabled = readingModeEnabled,
        _bookmarkedVerses = bookmarkedVerses,
+       _highlightedWords = highlightedWords,
        _checkedVerses = checkedVerses == null
            ? null
            : Map<int, int>.unmodifiable(checkedVerses),
@@ -482,28 +503,83 @@ class RenderHebrewGreekText extends RenderBox {
   int _checkedVersesRevision;
   int? _spotlightVerse;
 
-  static List<VerseLayoutBlock> _buildBlocks(List<HebrewGreekWord> words) {
+  static List<VerseLayoutBlock> _buildBlocks(
+    List<HebrewGreekWord> words,
+    List<(int, int)> highlightedWords,
+  ) {
     final blocks = <VerseLayoutBlock>[];
     int? currentVerse;
     List<HebrewGreekWord> currentWords = [];
+    int? startHighlightVerse;
+    int? endHighlightVerse;
+    int highlightIdx = 0;
+
+    if (highlightedWords.isNotEmpty) {
+      final startWordId = highlightedWords.first.$1;
+      final endWordId = highlightedWords.first.$2;
+      startHighlightVerse = (startWordId ~/ 100) % 1000;
+      endHighlightVerse = (endWordId ~/ 100) % 1000;
+      highlightIdx++;
+    }
+
+    int? startWordHighlight;
+    int? endWordHighlight;
 
     for (final w in words) {
       final verse = (w.id ~/ 100) % 1000;
 
-      if (currentVerse != verse) {
-        if (currentWords.isNotEmpty) {
-          blocks.add(VerseLayoutBlock(currentVerse!, currentWords));
+      if (currentVerse == null || currentVerse != verse) {
+        if (startHighlightVerse != null) {
+          if (verse == startHighlightVerse) {
+            startWordHighlight = startHighlightVerse;
+          } else if (verse > startHighlightVerse) {
+            startWordHighlight = 1;
+          } else {
+            startWordHighlight = null;
+          }
         }
-        currentVerse = verse;
+
+        if (endHighlightVerse != null) {
+          if (verse == endHighlightVerse) {
+            endWordHighlight = endHighlightVerse;
+
+            //get next highlight
+            if (highlightIdx < highlightedWords.length) {
+              final startWordId = highlightedWords[highlightIdx].$1;
+              final endWordId = highlightedWords[highlightIdx++].$2;
+              startHighlightVerse = (startWordId ~/ 100) % 1000;
+              endHighlightVerse = (endWordId ~/ 100) % 1000;
+            }
+          } else {
+            //thats the maximum word that can exist in a single verse;
+            //means highlight till the end
+            endWordHighlight = 99;
+          }
+        }
+
+        if (blocks.isNotEmpty && blocks.last.words.isEmpty) {
+          blocks.removeLast();
+        }
 
         currentWords = [];
+
+        currentVerse = verse;
+
+        blocks.add(
+          VerseLayoutBlock(
+            currentVerse,
+            currentWords,
+            startWordHighlight,
+            endWordHighlight,
+          ),
+        );
       }
 
       currentWords.add(w);
     }
 
-    if (currentWords.isNotEmpty) {
-      blocks.add(VerseLayoutBlock(currentVerse!, currentWords));
+    if (blocks.isNotEmpty && blocks.last.words.isEmpty) {
+      blocks.removeLast();
     }
 
     return blocks;
@@ -516,7 +592,7 @@ class RenderHebrewGreekText extends RenderBox {
   set words(List<HebrewGreekWord> value) {
     if (_words == value) return;
     _words = value;
-    _verses = _buildBlocks(value);
+    _verses = _buildBlocks(_words, _highlightedWords);
     _needsResetVersesRenderers = true;
     _needsTextPaintersUpdate = true;
     markNeedsLayout();
@@ -718,11 +794,11 @@ class RenderHebrewGreekText extends RenderBox {
     markNeedsPaint();
   }
 
-  Color? _bookmarkColor;
-  Color? get bookmarkColor => _bookmarkColor;
-  set bookmarkColor(Color? value) {
-    if (_bookmarkColor == value) return;
-    _bookmarkColor = value;
+  Color? _userHighlightColor;
+  Color? get userHighlightColor => _userHighlightColor;
+  set userHighlightColor(Color? value) {
+    if (_userHighlightColor == value) return;
+    _userHighlightColor = value;
     markNeedsPaint();
   }
 
@@ -732,6 +808,17 @@ class RenderHebrewGreekText extends RenderBox {
     if (setEquals(_bookmarkedVerses, verses)) return;
     _bookmarkedVerses = verses;
     _needsResetVersesRenderers = true;
+    _needsTextPaintersUpdate = true;
+    markNeedsLayout();
+  }
+
+  List<(int, int)> _highlightedWords;
+  List<(int, int)> get highlightedWords => _highlightedWords;
+  set highlightedWords(List<(int, int)> highlightedWords) {
+    if (listEquals(_highlightedWords, verses)) return;
+    _highlightedWords = highlightedWords;
+    _needsResetVersesRenderers = true;
+    _needsTextPaintersUpdate = true;
     markNeedsLayout();
   }
 
@@ -836,11 +923,27 @@ class RenderHebrewGreekText extends RenderBox {
 
       final verseRenderer = VerseRenderer(
         verse.verse,
-        _bookmarkedVerses.contains(verse.verse),
         verseNumberPainter,
+        verse.highlightWordStart,
+        verse.highlightWordEnd,
       );
 
       _verseRenderer.add(verseRenderer);
+
+      if (_bookmarkedVerses.contains(verse.verse)) {
+        final painter = TextPainter(
+          text: TextSpan(
+            text: String.fromCharCode(Icons.bookmark.codePoint),
+            style: _verseNumberStyle!.copyWith(
+              fontFamily: Icons.bookmark.fontFamily,
+              package: Icons.bookmark.fontPackage,
+            ),
+          ),
+          textDirection: _textDirection,
+        )..layout();
+
+        verseRenderer.bookmarkIconPainter = painter;
+      }
 
       //for each word of the verse
       for (final word in verse.words) {
@@ -912,7 +1015,19 @@ class RenderHebrewGreekText extends RenderBox {
         text: '${verseRenderer.verse}',
         style: _verseNumberStyle,
       );
+
       verseRenderer.verseNumberPainter.layout();
+
+      if (verseRenderer.bookmarkIconPainter != null) {
+        verseRenderer.bookmarkIconPainter!.text = TextSpan(
+          text: String.fromCharCode(Icons.bookmark.codePoint),
+          style: _verseNumberStyle!.copyWith(
+            fontFamily: Icons.bookmark.fontFamily,
+            package: Icons.bookmark.fontPackage,
+          ),
+        );
+        verseRenderer.bookmarkIconPainter!.layout();
+      }
     }
   }
 
@@ -1056,10 +1171,14 @@ class RenderHebrewGreekText extends RenderBox {
           currentLineWordIds,
           j == 0 ? verse.verseNumberPainter : null,
           j == 0 ? verse.verseReadingCountPainter : null,
+          j == 0 ? verse.bookmarkIconPainter : null,
           j == 0 ? verse.checkboxSize : null,
         );
 
-        if (verse.isBookmarked) {
+        if (verse.highlightWordStart != null &&
+            verse.highlightWordEnd != null &&
+            verse.highlightWordStart! <= j + 1 &&
+            j <= verse.highlightWordEnd!) {
           //new line started, add save previous line
           if (currentLineWordIds.length == 1 || top == null) {
             if (top != null) {
@@ -1159,16 +1278,22 @@ class RenderHebrewGreekText extends RenderBox {
     List<int> currentLineWordIds,
     TextPainter? verseNumberPainter,
     TextPainter? countPainter,
+    TextPainter? bookmarkPainter,
     Size? checkboxSize,
   ) {
     final wordPainter = wordRenderer.painter;
     final word = wordRenderer.word;
     final wordSize = wordPainter.size;
     final verseNumberSize = verseNumberPainter?.size ?? Size.zero;
+    final bookmarkSize = bookmarkPainter?.size;
     final checkboxHeight = checkboxSize?.height ?? 0.0;
 
     final verseNumberUnitWidth = verseNumberPainter != null
         ? verseNumberPainter.size.width + spaceWidth
+        : 0.0;
+
+    final bookmarkUnitWidth = bookmarkPainter != null
+        ? bookmarkPainter.size.width + spaceWidth
         : 0.0;
 
     final checkboxUnitWidth = checkboxSize != null
@@ -1176,7 +1301,10 @@ class RenderHebrewGreekText extends RenderBox {
         : 0.0;
 
     final totalUnitWidth =
-        verseNumberUnitWidth + checkboxUnitWidth + wordSize.width;
+        verseNumberUnitWidth +
+        bookmarkUnitWidth +
+        checkboxUnitWidth +
+        wordSize.width;
 
     // Should this verse start on a new line?
     bool fitsOnLine = true;
@@ -1227,8 +1355,10 @@ class RenderHebrewGreekText extends RenderBox {
         offset,
         verseNumberPainter,
         checkboxSize,
+        bookmarkSize,
         verseNumberSize,
         spaceWidth,
+        effectiveSpaceWidth,
       );
     } else {
       mainAxisOffset = _layoutRTL(
@@ -1239,6 +1369,7 @@ class RenderHebrewGreekText extends RenderBox {
         offset,
         verseNumberPainter,
         checkboxSize,
+        bookmarkSize,
         verseNumberSize,
         spaceWidth,
         effectiveSpaceWidth,
@@ -1261,7 +1392,9 @@ class RenderHebrewGreekText extends RenderBox {
     double offset,
     TextPainter? verseNumberPainter,
     Size? checkboxSize,
+    Size? bookmarkSize,
     Size verseNumberSize,
+    double spaceWidth,
     double effectiveSpaceWidth,
   ) {
     // 1. Position verse reading checkbox if it exists
@@ -1273,9 +1406,21 @@ class RenderHebrewGreekText extends RenderBox {
         checkboxSize.height,
       );
       verse.readingCheckboxRect = checkboxRect;
-      mainAxisOffset += checkboxSize.width;
+      mainAxisOffset += checkboxSize.width + spaceWidth;
     }
-    // 2. Position verse number if it exists
+    // 2. Position bookmark icon
+    if (bookmarkSize != null) {
+      final verseRect = Rect.fromLTWH(
+        mainAxisOffset,
+        crossAxisOffset,
+        bookmarkSize.width,
+        bookmarkSize.height,
+      );
+      verse.bookmarkIconRect = verseRect;
+      mainAxisOffset += bookmarkSize.width + spaceWidth;
+    }
+
+    // 3. Position verse number if it exists
     if (verseNumberPainter != null) {
       final verseRect = Rect.fromLTWH(
         mainAxisOffset,
@@ -1284,9 +1429,9 @@ class RenderHebrewGreekText extends RenderBox {
         verseNumberSize.height,
       );
       verse.verseNumberRect = verseRect;
-      mainAxisOffset += verseNumberSize.width;
+      mainAxisOffset += verseNumberSize.width + spaceWidth;
     }
-    // 3. Position the word
+    // 4. Position the word
     final wordRect = Rect.fromLTWH(
       mainAxisOffset,
       crossAxisOffset,
@@ -1308,9 +1453,10 @@ class RenderHebrewGreekText extends RenderBox {
     double offset,
     TextPainter? verseNumberPainter,
     Size? checkboxSize,
+    Size? bookmarkSize,
     Size verseNumberSize,
-    double effectiveSpaceWidth,
     double spaceWidth,
+    double effectiveSpaceWidth,
   ) {
     // RTL
     // 1. Position verse reading checkbox if it exists
@@ -1326,7 +1472,19 @@ class RenderHebrewGreekText extends RenderBox {
       verse.readingCheckboxRect = checkboxRect;
       mainAxisOffset -= spaceWidth;
     }
-    // 2. Position verse number if it exists (at the rightmost available spot)
+    // 2. Position bookmark if exists
+    if (bookmarkSize != null) {
+      mainAxisOffset -= bookmarkSize.width;
+      final checkboxRect = Rect.fromLTWH(
+        mainAxisOffset,
+        crossAxisOffset,
+        bookmarkSize.width,
+        bookmarkSize.height,
+      );
+      verse.bookmarkIconRect = checkboxRect;
+      //mainAxisOffset -= spaceWidth;
+    }
+    // 3. Position verse number if it exists (at the rightmost available spot)
     if (verseNumberPainter != null) {
       // Move cursor left by the width of the number to find its top-left
       mainAxisOffset -= verseNumberSize.width;
@@ -1339,7 +1497,7 @@ class RenderHebrewGreekText extends RenderBox {
       verse.verseNumberRect = verseRect;
       mainAxisOffset -= spaceWidth;
     }
-    // 3. Position the word to the left of the verse number (or at the start)
+    // 4. Position the word to the left of the verse number (or at the start)
     mainAxisOffset -= wordRenderer.painter.size.width;
     final wordRect = Rect.fromLTWH(
       mainAxisOffset,
@@ -1409,6 +1567,10 @@ class RenderHebrewGreekText extends RenderBox {
 
       if (vr.verseReadingCountPainter != null) {
         totalWidth += vr.verseReadingCountPainter!.width + _spacePainter.width;
+      }
+
+      if (vr.bookmarkIconPainter != null) {
+        totalWidth += vr.bookmarkIconPainter!.width + _spacePainter.width;
       }
 
       // Sum of  words + inter-word spaces, skipping words that end with a maqaph.
@@ -1723,9 +1885,9 @@ class RenderHebrewGreekText extends RenderBox {
         _paintCheckboxes(canvas, verse);
       }
 
-      if (_bookmarkColor != null && verse.highlightRects.isNotEmpty) {
+      if (_userHighlightColor != null && verse.highlightRects.isNotEmpty) {
         final bookmarkPath = Path();
-        final paint = Paint()..color = _bookmarkColor!;
+        final paint = Paint()..color = _userHighlightColor!;
         for (Rect r in verse.highlightRects) {
           final displayRect = r.inflate(-0.2);
           final rrect = RRect.fromRectAndRadius(
@@ -1737,6 +1899,13 @@ class RenderHebrewGreekText extends RenderBox {
         }
 
         canvas.drawPath(bookmarkPath, paint);
+      }
+
+      if (verse.bookmarkIconPainter != null) {
+        verse.bookmarkIconPainter!.paint(
+          canvas,
+          verse.bookmarkIconRect!.topLeft,
+        );
       }
 
       // 2.1 Paint the verse number

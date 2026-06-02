@@ -54,7 +54,10 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         Scaffold(
           appBar: _buildAppBar(),
-          drawer: AppDrawer(onSettingsClosed: manager.notifySettingsChanged),
+          drawer: AppDrawer(
+            onSettingsClosed: manager.notifySettingsChanged,
+            homeManager: manager,
+          ),
           body: _buildBody(),
         ),
         _buildGuideOverlay(),

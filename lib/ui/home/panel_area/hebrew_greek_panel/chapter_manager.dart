@@ -22,6 +22,7 @@ class HebrewGreekChapterManager {
   final textNotifier = _SafeValueNotifier<List<HebrewGreekWord>>([]);
   final verseCheckboxNotifier = VerseCheckboxNotifier();
   final bookmarkedVerses = _SafeValueNotifier<Set<int>>({});
+  final highlightedWords = _SafeValueNotifier<List<(int, int)>>([]);
   bool _disposed = false;
   int _chapterLoadToken = 0;
   int _readVersesLoadToken = 0;
@@ -52,12 +53,21 @@ class HebrewGreekChapterManager {
     final bookmarks = await _bookmarkDb.getBookmarksFor(bookId, chapter);
     Set<int> bookmarkVerses = {};
     for (Bookmark b in bookmarks) {
-      for (int i = b.fromVerse; i <= b.toVerse; i++) {
-        bookmarkVerses.add(i);
-      }
+      bookmarkVerses.add(b.verse);
     }
     if (_disposed) return;
     bookmarkedVerses.value = bookmarkVerses;
+  }
+
+  Future<void> loadHighlightedWords(int bookId, int chapter) async {
+    if (_disposed) return;
+    final highlights = await _bookmarkDb.getHighlightsFor(bookId, chapter);
+    List<(int, int)> highlightedWordsList = [];
+    for (Highlight b in highlights) {
+      highlightedWordsList.add((b.fromWord, b.toWord));
+    }
+    if (_disposed) return;
+    highlightedWords.value = highlightedWordsList;
   }
 
   Future<void> markVerseAsRead(int bookId, int chapter, int verse) async {
@@ -180,6 +190,21 @@ class HebrewGreekChapterManager {
       }
     }
     return buffer.toString();
+  }
+
+  Future<void> createBookmark(int bookId, int chapter, int verse) async {
+    Set<int> bookmarks = Set.of(bookmarkedVerses.value);
+    bookmarks.add(verse);
+
+    Bookmark b = Bookmark(
+      date: DateTime.now(),
+      bookId: bookId,
+      chapter: chapter,
+      verse: verse,
+    );
+    await _bookmarkDb.insertBookmark(b);
+
+    bookmarkedVerses.value = bookmarks;
   }
 
   void dispose() {

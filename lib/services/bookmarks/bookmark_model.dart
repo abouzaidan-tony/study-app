@@ -3,16 +3,14 @@ class Bookmark {
   final DateTime date;
   final int bookId;
   final int chapter;
-  final int fromVerse;
-  final int toVerse;
+  final int verse;
 
   Bookmark({
     this.id,
     required this.date,
     required this.bookId,
     required this.chapter,
-    required this.fromVerse,
-    required this.toVerse,
+    required this.verse,
   });
 
   static const _undefined = Object();
@@ -22,16 +20,14 @@ class Bookmark {
     DateTime? date,
     int? bookId,
     int? chapter,
-    int? fromVerse,
-    int? toVerse,
+    int? verse,
   }) {
     return Bookmark(
       id: id == _undefined ? this.id : id as int?,
       date: date ?? this.date,
       bookId: bookId ?? this.bookId,
       chapter: chapter ?? this.chapter,
-      fromVerse: fromVerse ?? this.fromVerse,
-      toVerse: toVerse ?? this.toVerse,
+      verse: verse ?? this.verse,
     );
   }
 
@@ -41,8 +37,7 @@ class Bookmark {
       date: DateTime.parse(map['date']),
       bookId: map['book_id'],
       chapter: map['chapter'],
-      fromVerse: map['from_verse'],
-      toVerse: map['to_verse'],
+      verse: map['verse'],
     );
   }
 
@@ -52,8 +47,67 @@ class Bookmark {
       'date': date.toIso8601String(),
       'book_id': bookId,
       'chapter': chapter,
-      'from_verse': fromVerse,
-      'to_verse': toVerse,
+      'verse': verse,
+    };
+  }
+}
+
+class Highlight {
+  final int? id;
+  final DateTime date;
+  final int bookId;
+  final int chapter;
+  final int fromWord;
+  final int toWord;
+
+  Highlight({
+    this.id,
+    required this.date,
+    required this.bookId,
+    required this.chapter,
+    required this.fromWord,
+    required this.toWord,
+  });
+
+  static const _undefined = Object();
+
+  Highlight copyWith({
+    Object? id = _undefined,
+    DateTime? date,
+    int? bookId,
+    int? chapter,
+    int? fromWord,
+    int? toWord,
+  }) {
+    return Highlight(
+      id: id == _undefined ? this.id : id as int?,
+      date: date ?? this.date,
+      bookId: bookId ?? this.bookId,
+      chapter: chapter ?? this.chapter,
+      fromWord: fromWord ?? this.fromWord,
+      toWord: toWord ?? this.toWord,
+    );
+  }
+
+  factory Highlight.fromMap(Map<String, dynamic> map) {
+    return Highlight(
+      id: map['id'],
+      date: DateTime.parse(map['date']),
+      bookId: map['book_id'],
+      chapter: map['chapter'],
+      fromWord: map['from_word'],
+      toWord: map['to_word'],
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'date': date.toIso8601String(),
+      'book_id': bookId,
+      'chapter': chapter,
+      'from_word': fromWord,
+      'to_word': toWord,
     };
   }
 }

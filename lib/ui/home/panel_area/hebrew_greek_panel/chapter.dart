@@ -1,9 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:studyapp/common/book_name.dart';
 import 'package:studyapp/common/word.dart';
-import 'package:studyapp/l10n/app_localizations.dart';
 import 'package:studyapp/services/reading_session/rs_manager.dart';
 import 'package:studyapp/ui/common/resource_ui_helper.dart';
 import 'package:studyapp/services/settings/user_settings.dart';
@@ -11,6 +9,7 @@ import 'package:studyapp/ui/home/panel_area/common/infinite_scroll_view.dart';
 import 'package:studyapp/ui/home/common/scroll_sync_controller.dart';
 import 'package:studyapp/ui/home/panel_area/hebrew_greek_panel/chapter_manager.dart';
 import 'package:studyapp/ui/home/panel_area/hebrew_greek_panel/text.dart';
+import 'package:studyapp/ui/home/verse_selection_dialog/verse_selection_dialog.dart';
 import 'package:studyapp/ui/home/word_details_dialog/word_details_dialog.dart';
 
 class VerseNumberTapNotification extends Notification {
@@ -71,6 +70,7 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
     }
 
     manager.loadBookmarkedVerses(widget.bookId, widget.chapter);
+    manager.loadHighlightedWords(widget.bookId, widget.chapter);
 
     _textController.setSpotlightUpdatedCalllback(
       _reportReadingCheckboxGuideRect,
@@ -90,6 +90,7 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
       }
 
       manager.loadBookmarkedVerses(widget.bookId, widget.chapter);
+      manager.loadHighlightedWords(widget.bookId, widget.chapter);
     } else if (widget.readingModeEnabled && !oldWidget.readingModeEnabled) {
       manager.loadReadVerses(widget.bookId, widget.chapter);
     }
@@ -160,6 +161,7 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
       listenable: Listenable.merge([
         manager.verseCheckboxNotifier,
         manager.bookmarkedVerses,
+        manager.highlightedWords,
       ]),
       builder: (context, child) {
         final checkedVerses = manager.verseCheckboxNotifier.value;
@@ -167,6 +169,7 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
         final resetCheckedVerses = manager.verseCheckboxNotifier.resetAll;
         final checkedVersesRevision = manager.verseCheckboxNotifier.revision;
         final bookmarkedVerses = manager.bookmarkedVerses.value;
+        final highlightedWords = manager.highlightedWords.value;
         return ValueListenableBuilder<List<HebrewGreekWord>>(
           valueListenable: manager.textNotifier,
           builder: (context, words, child) {
@@ -209,6 +212,7 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
                         checkedVersesRevision: checkedVersesRevision,
                         spotlightVerse: spotlightVerse,
                         bookmarkedVerses: bookmarkedVerses,
+                        highlightedWords: highlightedWords,
                         controller: _textController,
                         textDirection: manager.isRtl(widget.bookId)
                             ? TextDirection.rtl
@@ -247,7 +251,7 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
                           }
                         },
                         onVerseNumberLongPress: (verse) {
-                          _copyVerseToClipboard(context, verse);
+                          _showVerseSelectionDialog(verse);
                         },
                         popupBackgroundColor: Theme.of(
                           context,
@@ -271,7 +275,7 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
                         highlightColor: Theme.of(
                           context,
                         ).colorScheme.primary.withValues(alpha: 0.25),
-                        bookmarkColor: Theme.of(
+                        userHighlightColor: Theme.of(
                           context,
                         ).colorScheme.primary.withValues(alpha: 0.4),
                       ),
@@ -367,17 +371,23 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
     );
   }
 
-  void _copyVerseToClipboard(BuildContext context, int verse) {
+  Future<void> _showVerseSelectionDialog(int verse) async {
     final text = manager.getVerseText(verse);
     if (text.isEmpty) return;
 
-    Clipboard.setData(ClipboardData(text: text));
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(AppLocalizations.of(context)!.verseCopied),
-        duration: Durations.extralong1,
+    await showDialog(
+      context: context,
+      builder: (context) => VerseSelectionDialog(
+        bookId: widget.bookId,
+        chapter: widget.chapter,
+        verse: verse,
+        text: text,
+        onBookmarkCreated: createBookmark,
       ),
     );
+  }
+
+  void createBookmark(int verse) {
+    manager.createBookmark(widget.bookId, widget.chapter, verse);
   }
 }

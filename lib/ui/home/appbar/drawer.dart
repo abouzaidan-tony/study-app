@@ -2,13 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:studyapp/ui/about/about.dart';
 import 'package:studyapp/l10n/app_localizations.dart';
 import 'package:studyapp/ui/backup_restore/backup_restore.dart';
+import 'package:studyapp/ui/bookmark/bookmarks_page.dart';
 import 'package:studyapp/ui/download/download_manager_page.dart';
+import 'package:studyapp/ui/home/home_manager.dart';
 import 'package:studyapp/ui/search/search.dart';
 import 'package:studyapp/ui/settings/settings_page.dart';
 
 class AppDrawer extends StatelessWidget {
-  const AppDrawer({super.key, required this.onSettingsClosed});
+  const AppDrawer({
+    super.key,
+    required this.homeManager,
+    required this.onSettingsClosed,
+  });
 
+  final HomeManager homeManager;
   final VoidCallback onSettingsClosed;
 
   @override
@@ -64,6 +71,20 @@ class AppDrawer extends StatelessWidget {
                   context,
                   MaterialPageRoute(
                     builder: (context) => const DownloadManagerPage(),
+                  ),
+                );
+              },
+            ),
+            ListTile(
+              title: Text("Bookmarks"),
+              leading: const Icon(Icons.bookmark),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        BookmarksManagerPage(homeManager: homeManager),
                   ),
                 );
               },
