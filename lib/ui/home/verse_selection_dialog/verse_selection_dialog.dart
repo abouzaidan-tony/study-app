@@ -9,14 +9,16 @@ class VerseSelectionDialog extends StatefulWidget {
     required this.chapter,
     required this.verse,
     required this.text,
-    required this.onBookmarkCreated,
+    this.onBookmarkCreated,
+    this.onBookmarkRemoved,
   });
 
   final int bookId;
   final int chapter;
   final int verse;
   final String text;
-  final ValueChanged<int> onBookmarkCreated;
+  final ValueChanged<int>? onBookmarkCreated;
+  final ValueChanged<int>? onBookmarkRemoved;
 
   @override
   State<VerseSelectionDialog> createState() => _VerseSelectionDialogState();
@@ -60,13 +62,22 @@ class _VerseSelectionDialogState extends State<VerseSelectionDialog> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        IconButton(
-          icon: Icon(Icons.bookmark, color: iconColor),
-          onPressed: () {
-            widget.onBookmarkCreated(widget.verse);
-            Navigator.of(context).pop();
-          },
-        ),
+        if (widget.onBookmarkCreated != null)
+          IconButton(
+            icon: Icon(Icons.bookmark_add, color: iconColor),
+            onPressed: () {
+              widget.onBookmarkCreated?.call(widget.verse);
+              Navigator.of(context).pop();
+            },
+          ),
+        if (widget.onBookmarkRemoved != null)
+          IconButton(
+            icon: Icon(Icons.bookmark_remove, color: iconColor),
+            onPressed: () {
+              widget.onBookmarkRemoved?.call(widget.verse);
+              Navigator.of(context).pop();
+            },
+          ),
         const SizedBox(width: 24),
         IconButton(
           icon: AnimatedSwitcher(

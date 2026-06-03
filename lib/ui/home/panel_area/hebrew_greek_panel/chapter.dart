@@ -251,7 +251,8 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
                           }
                         },
                         onVerseNumberLongPress: (verse) {
-                          _showVerseSelectionDialog(verse);
+                          final isBookmarked = bookmarkedVerses.contains(verse);
+                          _showVerseSelectionDialog(verse, isBookmarked);
                         },
                         popupBackgroundColor: Theme.of(
                           context,
@@ -371,7 +372,7 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
     );
   }
 
-  Future<void> _showVerseSelectionDialog(int verse) async {
+  Future<void> _showVerseSelectionDialog(int verse, bool isBookmarked) async {
     final text = manager.getVerseText(verse);
     if (text.isEmpty) return;
 
@@ -382,12 +383,17 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
         chapter: widget.chapter,
         verse: verse,
         text: text,
-        onBookmarkCreated: createBookmark,
+        onBookmarkCreated: !isBookmarked ? createBookmark : null,
+        onBookmarkRemoved: isBookmarked ? deleteBookmark : null,
       ),
     );
   }
 
   void createBookmark(int verse) {
     manager.createBookmark(widget.bookId, widget.chapter, verse);
+  }
+
+  void deleteBookmark(int verse) {
+    manager.deleteBookmark(widget.bookId, widget.chapter, verse);
   }
 }

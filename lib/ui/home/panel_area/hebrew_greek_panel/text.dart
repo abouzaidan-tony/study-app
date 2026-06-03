@@ -1623,6 +1623,12 @@ class RenderHebrewGreekText extends RenderBox {
         return true;
       }
 
+      // Check verse numbers first
+      if (vr.bookmarkIconRect?.contains(position) ?? false) {
+        result.add(VerseNumberHitTestEntry(this, vr.verse));
+        return true;
+      }
+
       // then check verse checkbox
       if (vr.readingCheckboxRect?.contains(position) ?? false) {
         result.add(VerseCheckboxHitTestEntry(this, vr.verse));

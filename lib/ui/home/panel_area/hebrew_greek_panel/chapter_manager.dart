@@ -207,6 +207,15 @@ class HebrewGreekChapterManager {
     bookmarkedVerses.value = bookmarks;
   }
 
+  Future<void> deleteBookmark(int bookId, int chapter, int verse) async {
+    Set<int> bookmarks = Set.of(bookmarkedVerses.value);
+    bookmarks.remove(verse);
+
+    await _bookmarkDb.deleteBookmarkByReference(bookId, chapter, verse);
+
+    bookmarkedVerses.value = bookmarks;
+  }
+
   void dispose() {
     _disposed = true;
     _chapterLoadToken++;

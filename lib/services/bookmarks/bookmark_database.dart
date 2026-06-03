@@ -37,6 +37,18 @@ class BookmarksDatabase extends AbstractDatabase {
     return await database.delete('bookmark', where: 'id = ?', whereArgs: [id]);
   }
 
+  Future<int> deleteBookmarkByReference(
+    int bookId,
+    int chapter,
+    int verse,
+  ) async {
+    return await database.delete(
+      'bookmark',
+      where: 'book_id = ? and chapter = ? and verse = ?',
+      whereArgs: [bookId, chapter, verse],
+    );
+  }
+
   Future<List<Bookmark>> getBookmarksFor(int bookId, int chapter) async {
     final result = await database.query(
       'bookmark',
