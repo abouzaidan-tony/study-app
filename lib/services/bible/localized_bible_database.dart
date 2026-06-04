@@ -103,4 +103,62 @@ class LocalizedBibleDatabase {
         bookId * bookMultiplier + (chapter + 1) * chapterMultiplier;
     return (lowerBound, upperBound);
   }
+
+  Future<List<UsfmLine>> getChapterVerse(
+    String langCode,
+    int bookId,
+    int chapter,
+    int verse,
+  ) async {
+    // Ensure DB is open for this language
+    if (_database == null || _currentLangCode != langCode) {
+      await initDb(langCode);
+    }
+
+    if (_database == null) return [];
+
+    try {
+      final (lowerBound, upperBound) = _verseBounds(bookId, chapter, verse);
+
+      final verses = await _database!.query(
+        BibleSchema.bibleTextTable,
+        columns: [
+          BibleSchema.colReference,
+          BibleSchema.colText,
+          BibleSchema.colFormat,
+        ],
+        where:
+            '${BibleSchema.colReference} >= ? AND ${BibleSchema.colReference} < ?',
+        whereArgs: [lowerBound, upperBound],
+        orderBy: '${BibleSchema.colId} ASC',
+      );
+
+      return verses.map((verse) {
+        final format = verse[BibleSchema.colFormat] as String;
+        return UsfmLine(
+          bookChapterVerse: verse[BibleSchema.colReference] as int,
+          text: verse[BibleSchema.colText] as String,
+          format: ParagraphFormat.fromJson(format),
+        );
+      }).toList();
+    } catch (e, s) {
+      log('Error getting bible text for $langCode', error: e, stackTrace: s);
+      return [];
+    }
+  }
+
+  (int, int) _verseBounds(int bookId, int chapter, int verse) {
+    const int bookMultiplier = 1000000;
+    const int chapterMultiplier = 1000;
+    const int verseMultiplier = 1;
+    final int lowerBound =
+        bookId * bookMultiplier +
+        chapter * chapterMultiplier +
+        verse * verseMultiplier;
+    final int upperBound =
+        bookId * bookMultiplier +
+        chapter * chapterMultiplier +
+        (verse + 1) * verseMultiplier;
+    return (lowerBound, upperBound);
+  }
 }

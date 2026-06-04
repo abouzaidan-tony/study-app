@@ -1,4 +1,7 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
+import 'package:scripture/scripture.dart';
 import 'package:studyapp/common/book_name.dart';
 import 'package:studyapp/services/bookmarks/bookmark_model.dart';
 import 'package:studyapp/ui/bookmark/bookmarks_page_manager.dart';
@@ -36,7 +39,23 @@ class _BookmarksManagerPageState extends State<BookmarksManagerPage> {
                 (bi) => Card(
                   child: ListTile(
                     title: Text(formatBookmarkTitle(bi.bookmark)),
-                    subtitle: Text(bi.text),
+                    subtitle: Column(
+                      children: [
+                        Text(
+                          bi.text,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'sbl',
+                            fontSize: 22,
+                          ),
+                        ),
+
+                        SizedBox.fromSize(size: Size.fromHeight(8)),
+
+                        buildUsfm(bi.lines),
+                      ],
+                    ),
+
                     onTap: () {
                       widget.homeManager.onBookSelected(
                         context,
@@ -66,5 +85,31 @@ class _BookmarksManagerPageState extends State<BookmarksManagerPage> {
   String formatBookmarkTitle(Bookmark bookmark) {
     final book = bookNameForId(context, bookmark.bookId);
     return "$book ${bookmark.chapter}:${bookmark.verse}";
+  }
+
+  Widget buildUsfm(List<UsfmLine> verseLines) {
+    return UsfmWidget(
+      verseLines: verseLines,
+      selectionController: ScriptureSelectionController(),
+      onFootnoteTapped: (footnote) {},
+      onWordTapped: (id) => log("Tapped word $id"),
+      onSelectionRequested: (wordId) {},
+      showHeadings: false,
+      showVerseNumbers: false,
+      footnoteMarkerStyle: null,
+      styleBuilder: (format) {
+        final baseStyle = UsfmParagraphStyle.usfmDefaults(
+          format: format,
+          baseStyle: Theme.of(
+            context,
+          ).textTheme.bodyMedium!.copyWith(fontSize: 20),
+        );
+        return baseStyle.copyWith(
+          verseNumberStyle: baseStyle.textStyle.copyWith(
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        );
+      },
+    );
   }
 }

@@ -90,4 +90,41 @@ class BibleService {
     log('Fallback to English Bible for $langCode ($bookId:$chapter)');
     return await _englishDb.getChapter(bookId, chapter);
   }
+
+  /// Gets the chapter text.
+  /// Uses Localized DB if available for current locale, otherwise falls back to English.
+  Future<List<UsfmLine>> getChapterVerse(
+    int bookId,
+    int chapter,
+    int verse,
+  ) async {
+    final currentLocale = _settings.locale;
+    final langCode = currentLocale.languageCode;
+
+    // 1. If English, use English DB
+    if (langCode == 'en') {
+      return await _englishDb.getChapterVerse(bookId, chapter, verse);
+    }
+
+    // 2. Check if localized DB exists
+    final dbExists = await _localizedDb.bibleDbExists(langCode);
+
+    if (dbExists) {
+      // 3. Try to get localized text
+      final lines = await _localizedDb.getChapterVerse(
+        langCode,
+        bookId,
+        chapter,
+        verse,
+      );
+
+      if (lines.isNotEmpty) {
+        return lines;
+      }
+    }
+
+    // 4. Fallback: If DB missing or chapter missing in DB, return English
+    log('Fallback to English Bible for $langCode ($bookId:$chapter:$verse)');
+    return await _englishDb.getChapterVerse(bookId, chapter, verse);
+  }
 }
