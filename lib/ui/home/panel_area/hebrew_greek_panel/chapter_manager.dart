@@ -11,6 +11,39 @@ import 'package:studyapp/services/reading_session/rs_manager.dart';
 import 'package:studyapp/services/service_locator.dart';
 import 'package:studyapp/services/settings/user_settings.dart';
 
+class HighlightDetail {
+  Highlight highlight;
+  bool isDelete;
+  bool isActive;
+  bool isChanged;
+
+  HighlightDetail({
+    required this.highlight,
+    this.isDelete = false,
+    this.isActive = false,
+    this.isChanged = false,
+  });
+
+  HighlightDetail copyWith({
+    Highlight? highlight,
+    bool? isDelete,
+    bool? isActive,
+    bool? isChanged,
+  }) {
+    return HighlightDetail(
+      highlight: highlight ?? this.highlight,
+      isDelete: isDelete ?? this.isDelete,
+      isActive: isActive ?? this.isActive,
+      isChanged: isChanged ?? this.isChanged,
+    );
+  }
+
+  @override
+  String toString() {
+    return 'HighlightDetail(highlight: $highlight, isDelete: $isDelete, isActive: $isActive, isChanged: $isChanged)';
+  }
+}
+
 class HebrewGreekChapterManager {
   final _hebrewGreekDb = getIt<HebrewGreekDatabase>();
   final _glossService = getIt<GlossService>();
@@ -22,10 +55,16 @@ class HebrewGreekChapterManager {
   final textNotifier = _SafeValueNotifier<List<HebrewGreekWord>>([]);
   final verseCheckboxNotifier = VerseCheckboxNotifier();
   final bookmarkedVerses = _SafeValueNotifier<Set<int>>({});
-  final highlightedWords = _SafeValueNotifier<List<(int, int)>>([]);
+  final highlightedWords = _SafeValueNotifier<List<HighlightDetail>>([]);
+  final highlighModeEnabled = ValueNotifier<bool>(false);
+  final temporaryHighlightIdx = ValueNotifier<int?>(null);
+  int? activeHighlightAnchorWordId;
   bool _disposed = false;
   int _chapterLoadToken = 0;
   int _readVersesLoadToken = 0;
+
+  List<HighlightDetail> _dbHighlightedWords = [];
+  List<HighlightDetail> get dbHighlightedWords => _dbHighlightedWords;
 
   Future<void> loadChapterData(int bookId, int chapter) async {
     final token = ++_chapterLoadToken;
@@ -62,12 +101,48 @@ class HebrewGreekChapterManager {
   Future<void> loadHighlightedWords(int bookId, int chapter) async {
     if (_disposed) return;
     final highlights = await _bookmarkDb.getHighlightsFor(bookId, chapter);
-    List<(int, int)> highlightedWordsList = [];
+    List<HighlightDetail> highlightedWordsList = [];
     for (Highlight b in highlights) {
-      highlightedWordsList.add((b.fromWord, b.toWord));
+      highlightedWordsList.add(HighlightDetail(highlight: b));
     }
     if (_disposed) return;
+    _dbHighlightedWords = highlightedWordsList;
     highlightedWords.value = highlightedWordsList;
+  }
+
+  Future<void> saveHighlights(List<HighlightDetail> highlights) async {
+    if (_disposed) return;
+
+    final savedHighlights = <HighlightDetail>[];
+    for (final detail in highlights) {
+      if (detail.isDelete) {
+        final id = detail.highlight.id;
+        if (id != null) {
+          await _bookmarkDb.deleteHighlight(id);
+        }
+        continue;
+      }
+
+      var highlight = detail.highlight;
+      if (highlight.id == null) {
+        highlight = await _bookmarkDb.insertHighlight(highlight);
+      } else if (detail.isChanged) {
+        await _bookmarkDb.updateHighlight(highlight);
+      }
+
+      savedHighlights.add(
+        detail.copyWith(highlight: highlight, isChanged: false),
+      );
+    }
+
+    if (_disposed) return;
+    _dbHighlightedWords = List<HighlightDetail>.from(savedHighlights);
+    highlightedWords.value = savedHighlights;
+  }
+
+  Future<void> deleteHighlight(int existingHighlightId) async {
+    if (_disposed) return;
+    await _bookmarkDb.deleteHighlight(existingHighlightId);
   }
 
   Future<void> markVerseAsRead(int bookId, int chapter, int verse) async {
@@ -222,6 +297,10 @@ class HebrewGreekChapterManager {
     _readVersesLoadToken++;
     textNotifier.dispose();
     verseCheckboxNotifier.dispose();
+    bookmarkedVerses.dispose();
+    highlightedWords.dispose();
+    highlighModeEnabled.dispose();
+    temporaryHighlightIdx.dispose();
   }
 }
 

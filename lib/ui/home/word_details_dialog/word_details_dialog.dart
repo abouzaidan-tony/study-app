@@ -11,10 +11,15 @@ class WordDetailsDialog extends StatefulWidget {
     super.key,
     required this.wordId,
     required this.isRtl,
+    required this.onHighlightClick,
+    this.existingHighlightIdx,
   });
 
   final int wordId;
   final bool isRtl;
+  final int? existingHighlightIdx;
+  final FutureOr<void> Function(int wordId, int? existingHighlightIdx)
+  onHighlightClick;
 
   @override
   State<WordDetailsDialog> createState() => _WordDetailsDialogState();
@@ -208,6 +213,21 @@ class _WordDetailsDialogState extends State<WordDetailsDialog> {
                 builder: (context) => SimilarVersesPage(word: wordDetails),
               ),
             );
+          },
+        ),
+        const SizedBox(width: 24),
+        IconButton(
+          icon: Icon(
+            widget.existingHighlightIdx == null ? Icons.edit : Icons.edit_off,
+            color: iconColor,
+          ),
+          onPressed: () async {
+            await widget.onHighlightClick(
+              widget.wordId,
+              widget.existingHighlightIdx,
+            );
+            if (!context.mounted) return;
+            Navigator.of(context).pop();
           },
         ),
         const SizedBox(width: 24),

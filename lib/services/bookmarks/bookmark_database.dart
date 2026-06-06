@@ -78,6 +78,16 @@ class BookmarksDatabase extends AbstractDatabase {
     return await database.delete('highlight', where: 'id = ?', whereArgs: [id]);
   }
 
+  Future<int> updateHighlight(Highlight highlight) async {
+    if (highlight.id == null) return 0;
+    return await database.update(
+      'highlight',
+      highlight.toMap()..remove('id'),
+      where: 'id = ?',
+      whereArgs: [highlight.id],
+    );
+  }
+
   Future<List<Highlight>> getHighlightsFor(int bookId, int chapter) async {
     final result = await database.query(
       'highlight',

@@ -110,4 +110,9 @@ class Highlight {
       'to_word': toWord,
     };
   }
+
+  @override
+  String toString() {
+    return 'Highlight(id: $id, from_word: $fromWord, to_word: $toWord)';
+  }
 }

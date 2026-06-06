@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:studyapp/common/book_name.dart';
 import 'package:studyapp/common/word.dart';
+import 'package:studyapp/services/bookmarks/bookmark_model.dart';
 import 'package:studyapp/services/reading_session/rs_manager.dart';
 import 'package:studyapp/ui/common/resource_ui_helper.dart';
 import 'package:studyapp/services/settings/user_settings.dart';
@@ -162,6 +164,8 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
         manager.verseCheckboxNotifier,
         manager.bookmarkedVerses,
         manager.highlightedWords,
+        manager.highlighModeEnabled,
+        manager.temporaryHighlightIdx,
       ]),
       builder: (context, child) {
         final checkedVerses = manager.verseCheckboxNotifier.value;
@@ -170,6 +174,7 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
         final checkedVersesRevision = manager.verseCheckboxNotifier.revision;
         final bookmarkedVerses = manager.bookmarkedVerses.value;
         final highlightedWords = manager.highlightedWords.value;
+
         return ValueListenableBuilder<List<HebrewGreekWord>>(
           valueListenable: manager.textNotifier,
           builder: (context, words, child) {
@@ -213,6 +218,15 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
                         spotlightVerse: spotlightVerse,
                         bookmarkedVerses: bookmarkedVerses,
                         highlightedWords: highlightedWords,
+                        highlightModeEnabled: manager.highlighModeEnabled.value,
+                        highlightSelectionAnchorWordId:
+                            manager.activeHighlightAnchorWordId,
+                        onHighlightSelectionChanged:
+                            _onHighlightSelectionChanged,
+                        onHighlightSelectionCompleted:
+                            _onHighlightSelectionCompleted,
+                        onHighlightSelectionCanceled:
+                            _onHighlightSelectionCanceled,
                         controller: _textController,
                         textDirection: manager.isRtl(widget.bookId)
                             ? TextDirection.rtl
@@ -363,11 +377,23 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
   }
 
   Future<void> _showWordDetails(int wordId) async {
+    int? existingHighlightIdx;
+
+    for (int i = 0; i < manager.highlightedWords.value.length; i++) {
+      Highlight h = manager.highlightedWords.value[i].highlight;
+      if (wordId >= h.fromWord && wordId <= h.toWord) {
+        existingHighlightIdx = i;
+        break;
+      }
+    }
+
     await showDialog(
       context: context,
       builder: (context) => WordDetailsDialog(
         wordId: wordId,
         isRtl: manager.isRtl(widget.bookId),
+        onHighlightClick: _onHighlightClick,
+        existingHighlightIdx: existingHighlightIdx,
       ),
     );
   }
@@ -383,17 +409,166 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
         chapter: widget.chapter,
         verse: verse,
         text: text,
-        onBookmarkCreated: !isBookmarked ? createBookmark : null,
-        onBookmarkRemoved: isBookmarked ? deleteBookmark : null,
+        onBookmarkCreated: !isBookmarked ? _createBookmark : null,
+        onBookmarkRemoved: isBookmarked ? _deleteBookmark : null,
       ),
     );
   }
 
-  void createBookmark(int verse) {
+  void _createBookmark(int verse) {
     manager.createBookmark(widget.bookId, widget.chapter, verse);
   }
 
-  void deleteBookmark(int verse) {
+  void _deleteBookmark(int verse) {
     manager.deleteBookmark(widget.bookId, widget.chapter, verse);
+  }
+
+  Future<void> _onHighlightClick(int wordId, int? existingHighlightIdx) async {
+    if (existingHighlightIdx != null) {
+      List<HighlightDetail> highlights = List.of(
+        manager.highlightedWords.value,
+      );
+      Highlight h = highlights[existingHighlightIdx].highlight;
+      highlights.removeAt(existingHighlightIdx);
+      if (h.id != null) {
+        await manager.deleteHighlight(h.id!);
+      }
+      manager.highlightedWords.value = highlights;
+      return;
+    }
+
+    manager.highlighModeEnabled.value = true;
+    manager.activeHighlightAnchorWordId = wordId;
+
+    final highlights = _setActiveHighlightRange(
+      wordId,
+      wordId,
+      createIfMissing: true,
+    );
+    await manager.saveHighlights(highlights);
+  }
+
+  void _onHighlightSelectionChanged(int fromWordId, int toWordId) {
+    _setActiveHighlightRange(fromWordId, toWordId);
+  }
+
+  Future<void> _onHighlightSelectionCompleted(
+    int fromWordId,
+    int toWordId,
+  ) async {
+    final highlights = _setActiveHighlightRange(
+      fromWordId,
+      toWordId,
+      isActive: false,
+    );
+    _finishHighlightSelection();
+    await manager.saveHighlights(highlights);
+  }
+
+  void _onHighlightSelectionCanceled() {
+    final highlights = manager.highlightedWords.value
+        .map((detail) => detail.copyWith(isActive: false))
+        .toList();
+    manager.highlightedWords.value = highlights;
+    _finishHighlightSelection();
+  }
+
+  void _finishHighlightSelection() {
+    manager.highlighModeEnabled.value = false;
+    manager.temporaryHighlightIdx.value = null;
+    manager.activeHighlightAnchorWordId = null;
+  }
+
+  List<HighlightDetail> _setActiveHighlightRange(
+    int fromWordId,
+    int toWordId, {
+    bool createIfMissing = false,
+    bool isActive = true,
+  }) {
+    final fromWord = min(fromWordId, toWordId);
+    final toWord = max(fromWordId, toWordId);
+    final highlights = manager.highlightedWords.value
+        .map((detail) => detail.copyWith())
+        .toList();
+
+    final activeIndex = highlights.indexWhere(
+      (detail) => detail.isActive && !detail.isDelete,
+    );
+
+    if (activeIndex == -1) {
+      if (!createIfMissing) return highlights;
+
+      highlights.add(
+        HighlightDetail(
+          highlight: Highlight(
+            date: DateTime.now(),
+            bookId: widget.bookId,
+            chapter: widget.chapter,
+            fromWord: fromWord,
+            toWord: toWord,
+          ),
+          isActive: isActive,
+          isChanged: true,
+        ),
+      );
+    } else {
+      final active = highlights[activeIndex];
+      highlights[activeIndex] = active.copyWith(
+        highlight: active.highlight.copyWith(
+          fromWord: fromWord,
+          toWord: toWord,
+        ),
+        isActive: isActive,
+        isChanged: true,
+      );
+    }
+
+    highlights.sort(_sortHighlights);
+    mergeHighlights(highlights);
+    manager.highlightedWords.value = highlights;
+    return highlights;
+  }
+
+  int _sortHighlights(HighlightDetail x, HighlightDetail y) {
+    return x.highlight.fromWord.compareTo(y.highlight.fromWord);
+  }
+
+  void mergeHighlights(List<HighlightDetail> list) {
+    if (list.isEmpty) {
+      return;
+    }
+
+    HighlightDetail active = list[0];
+    active.isDelete = false;
+
+    for (int i = 1; i < list.length; i++) {
+      HighlightDetail cur = list[i];
+
+      cur.isDelete = false;
+
+      if (cur.highlight.fromWord <= active.highlight.toWord) {
+        HighlightDetail main, other;
+
+        if (cur.isActive) {
+          main = cur;
+          other = active;
+        } else {
+          main = active;
+          other = cur;
+        }
+
+        Highlight highlight = main.highlight.copyWith(
+          fromWord: min(main.highlight.fromWord, other.highlight.fromWord),
+          toWord: max(main.highlight.toWord, other.highlight.toWord),
+        );
+
+        main.isChanged = true;
+        other.isDelete = true;
+        main.highlight = highlight;
+        active = main;
+      } else {
+        active = cur;
+      }
+    }
   }
 }
