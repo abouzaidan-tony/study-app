@@ -36,10 +36,18 @@ class _LineMetrics {
   // The verse to show if this line is visible
   final int labelVerse;
 
+  //the minimum verse number on a given line
+  final int lowestVerseOnLine;
   //the maximum verse number on a given line
   final int highestVerseOnLine;
 
-  _LineMetrics(this.top, this.bottom, this.labelVerse, this.highestVerseOnLine);
+  _LineMetrics(
+    this.top,
+    this.bottom,
+    this.labelVerse,
+    this.lowestVerseOnLine,
+    this.highestVerseOnLine,
+  );
 }
 
 /// A way for the outside world (such as scroll controllers) to obtain the
@@ -262,8 +270,6 @@ class HebrewGreekText extends LeafRenderObjectWidget {
       popupTextStyle,
     );
 
-    log("Creating render object");
-
     return RenderHebrewGreekText(
       words: words,
       controller: controller,
@@ -328,8 +334,6 @@ class HebrewGreekText extends LeafRenderObjectWidget {
       fontSize: 20,
       color: Color(0xFFFFFFFF),
     ).merge(popupTextStyle);
-
-    log("update render object");
 
     renderObject
       ..words = words
@@ -1080,7 +1084,6 @@ class RenderHebrewGreekText extends RenderBox {
   }
 
   void _initializeVerseRenderers() {
-    log("Creating verse painters");
     //for each verse of the chapter
     for (final verse in verses) {
       final verseNumberPainter = TextPainter(
@@ -1283,7 +1286,15 @@ class RenderHebrewGreekText extends RenderBox {
 
     // Priority: Start Verse > Lowest Visible
     final label = bestStartVerse ?? lowestVerseOnLine ?? 1;
-    _lineMetrics.add(_LineMetrics(top, bottom, label, highestVerseOnLine ?? 1));
+    _lineMetrics.add(
+      _LineMetrics(
+        top,
+        bottom,
+        label,
+        lowestVerseOnLine ?? 1,
+        highestVerseOnLine ?? 1,
+      ),
+    );
     wordIds.clear();
   }
 
@@ -1831,7 +1842,7 @@ class RenderHebrewGreekText extends RenderBox {
     }
 
     for (
-      int i = verse.labelVerse - 1;
+      int i = verse.lowestVerseOnLine - 1;
       i < verse.highestVerseOnLine && i < _verseRenderer.length;
       i++
     ) {

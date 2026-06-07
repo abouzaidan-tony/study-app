@@ -2,7 +2,7 @@ name: studyapp
 description: "Global Bible Tools Hebrew and Greek Study App"
 publish_to: 'none'
 
-version: 1.1.4+42
+version: 1.1.6+44
 
 environment:
   sdk: ^3.9.0
@@ -41,6 +41,8 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 
 flutter:
+  config:
+    enable-swift-package-manager: false
   uses-material-design: true
   generate: true # needed for generating localization files
   fonts:
