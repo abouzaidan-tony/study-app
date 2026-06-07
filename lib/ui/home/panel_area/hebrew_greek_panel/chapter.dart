@@ -221,6 +221,8 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
                         highlightModeEnabled: manager.highlighModeEnabled.value,
                         highlightSelectionAnchorWordId:
                             manager.activeHighlightAnchorWordId,
+                        onHighlightSelectionStarted:
+                            _onHighlightSelectionStarted,
                         onHighlightSelectionChanged:
                             _onHighlightSelectionChanged,
                         onHighlightSelectionCompleted:
@@ -423,6 +425,19 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
     manager.deleteBookmark(widget.bookId, widget.chapter, verse);
   }
 
+  void _onHighlightSelectionStarted(int fromWordId, int toWordId) async {
+    final highlights = _setActiveHighlightRange(
+      fromWordId,
+      toWordId,
+      createIfMissing: true,
+    );
+
+    manager.highlighModeEnabled.value = true;
+    manager.activeHighlightAnchorWordId = fromWordId;
+
+    await manager.saveHighlights(highlights);
+  }
+
   Future<void> _onHighlightClick(int wordId, int? existingHighlightIdx) async {
     if (existingHighlightIdx != null) {
       List<HighlightDetail> highlights = List.of(
@@ -436,16 +451,6 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
       manager.highlightedWords.value = highlights;
       return;
     }
-
-    manager.highlighModeEnabled.value = true;
-    manager.activeHighlightAnchorWordId = wordId;
-
-    final highlights = _setActiveHighlightRange(
-      wordId,
-      wordId,
-      createIfMissing: true,
-    );
-    await manager.saveHighlights(highlights);
   }
 
   void _onHighlightSelectionChanged(int fromWordId, int toWordId) {

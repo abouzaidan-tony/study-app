@@ -109,6 +109,8 @@ class VerseRenderer {
   Size? checkboxSize;
   List<WordRenderer> words;
   List<Rect> highlightRects;
+  int? activeHighlightStartIdx;
+  int? activeHighlightEndIdx;
 
   VerseRenderer(this.verse, this.verseNumberPainter)
     : words = [],
@@ -161,6 +163,7 @@ class HebrewGreekText extends LeafRenderObjectWidget {
     this.highlightedWords = const [],
     this.highlightModeEnabled = false,
     this.highlightSelectionAnchorWordId,
+    this.onHighlightSelectionStarted,
     this.onHighlightSelectionChanged,
     this.onHighlightSelectionCompleted,
     this.onHighlightSelectionCanceled,
@@ -239,6 +242,7 @@ class HebrewGreekText extends LeafRenderObjectWidget {
   final List<HighlightDetail> highlightedWords;
   final bool highlightModeEnabled;
   final int? highlightSelectionAnchorWordId;
+  final WordRangeCallback? onHighlightSelectionStarted;
   final WordRangeCallback? onHighlightSelectionChanged;
   final WordRangeCallback? onHighlightSelectionCompleted;
   final VoidCallback? onHighlightSelectionCanceled;
@@ -285,6 +289,7 @@ class HebrewGreekText extends LeafRenderObjectWidget {
       highlightedWords: highlightedWords,
       highlightModeEnabled: highlightModeEnabled,
       highlightSelectionAnchorWordId: highlightSelectionAnchorWordId,
+      onHighlightSelectionStarted: onHighlightSelectionStarted,
       onHighlightSelectionChanged: onHighlightSelectionChanged,
       onHighlightSelectionCompleted: onHighlightSelectionCompleted,
       onHighlightSelectionCanceled: onHighlightSelectionCanceled,
@@ -352,6 +357,7 @@ class HebrewGreekText extends LeafRenderObjectWidget {
       ..highlightedWords = highlightedWords
       ..highlightModeEnabled = highlightModeEnabled
       ..highlightSelectionAnchorWordId = highlightSelectionAnchorWordId
+      ..onHighlightSelectionStarted = onHighlightSelectionStarted
       ..onHighlightSelectionChanged = onHighlightSelectionChanged
       ..onHighlightSelectionCompleted = onHighlightSelectionCompleted
       ..onHighlightSelectionCanceled = onHighlightSelectionCanceled
@@ -453,6 +459,7 @@ class RenderHebrewGreekText extends RenderBox {
     required List<HighlightDetail> highlightedWords,
     required bool highlightModeEnabled,
     int? highlightSelectionAnchorWordId,
+    WordRangeCallback? onHighlightSelectionStarted,
     WordRangeCallback? onHighlightSelectionChanged,
     WordRangeCallback? onHighlightSelectionCompleted,
     VoidCallback? onHighlightSelectionCanceled,
@@ -481,6 +488,7 @@ class RenderHebrewGreekText extends RenderBox {
        _highlightedWords = highlightedWords,
        _highlightModeEnabled = highlightModeEnabled,
        _highlightSelectionAnchorWordId = highlightSelectionAnchorWordId,
+       _onHighlightSelectionStarted = onHighlightSelectionStarted,
        _onHighlightSelectionChanged = onHighlightSelectionChanged,
        _onHighlightSelectionCompleted = onHighlightSelectionCompleted,
        _onHighlightSelectionCanceled = onHighlightSelectionCanceled,
@@ -492,6 +500,8 @@ class RenderHebrewGreekText extends RenderBox {
        _primaryColor = primaryColor {
     _updatePainters();
     _tapRecognizer = TapGestureRecognizer()..onTapUp = _handleTapUp;
+    _doubleTapRecognizer = DoubleTapGestureRecognizer()
+      ..onDoubleTapDown = _handleDoubleTapDown;
     _longPressRecognizer = LongPressGestureRecognizer()
       ..onLongPressStart = _handleLongPressStart;
     _panRecognizer = PanGestureRecognizer()
@@ -520,8 +530,10 @@ class RenderHebrewGreekText extends RenderBox {
   TextPainter? _popupPainter;
   Timer? _popupDismissTimer;
   late final TapGestureRecognizer _tapRecognizer;
+  late final DoubleTapGestureRecognizer _doubleTapRecognizer;
   late final LongPressGestureRecognizer _longPressRecognizer;
   late final PanGestureRecognizer _panRecognizer;
+
   int? _flashedWordId;
   Timer? _flashTimer;
   bool _isUpdatingHighlightSelection = false;
@@ -562,7 +574,131 @@ class RenderHebrewGreekText extends RenderBox {
     return blocks;
   }
 
-  static void _updateBlocksHighlights(List<HighlightDetail> highlightedWords) {}
+  static void _updateHighlightBlocks(
+    List<VerseRenderer> verseRenderer,
+    List<HighlightDetail> highlightedWords,
+    bool isLtr,
+  ) {
+    double? top, left;
+    double? bottom, right;
+
+    int? highlightStart;
+    int? highlightStartVerse;
+    int? highlightEnd;
+    int? highlightEndVerse;
+    int highlightIdx = 0;
+
+    while (highlightIdx < highlightedWords.length) {
+      if (highlightedWords[highlightIdx].isDelete) {
+        highlightIdx++;
+      } else {
+        break;
+      }
+    }
+
+    if (highlightIdx < highlightedWords.length) {
+      Highlight h = highlightedWords[highlightIdx].highlight;
+      highlightStart = h.fromWord;
+      highlightEnd = h.toWord;
+      highlightStartVerse = (highlightStart ~/ 100) % 1000;
+      highlightEndVerse = (highlightEnd ~/ 100) % 1000;
+    }
+
+    for (int i = 0; i < verseRenderer.length; i++) {
+      VerseRenderer verse = verseRenderer[i];
+      verse.highlightRects.clear();
+      verse.activeHighlightStartIdx = null;
+      verse.activeHighlightEndIdx = null;
+
+      for (int j = 0; j < verse.words.length; j++) {
+        HebrewGreekWord word = verse.words[j].word;
+
+        if (highlightStart != null &&
+            highlightEnd != null &&
+            highlightStart <= word.id &&
+            word.id <= highlightEnd) {
+          if (highlightedWords[highlightIdx].isActive &&
+              verse.activeHighlightStartIdx == null &&
+              verse.verse == highlightStartVerse) {
+            verse.activeHighlightStartIdx = verse.highlightRects.length;
+          }
+
+          if (highlightedWords[highlightIdx].isActive &&
+              verse.verse == highlightEndVerse) {
+            verse.activeHighlightEndIdx = verse.highlightRects.length;
+          }
+
+          bool isNewLine =
+              j > 0 &&
+              verse.words[j].rect!.topLeft.dy >
+                  verse.words[j - 1].rect!.topLeft.dy +
+                      verse.words[j - 1].rect!.height / 2;
+
+          //new line started, add save previous line
+          if (isNewLine || top == null) {
+            if (top != null) {
+              verse.highlightRects.add(
+                Rect.fromLTRB(left!, top, right!, bottom!),
+              );
+            }
+
+            Rect r = verse.words[j].rect!;
+
+            top = r.top;
+            if (isLtr) {
+              left = r.left;
+            } else {
+              right = r.right;
+            }
+          }
+
+          bottom = verse.words[j].rect!.bottom;
+          if (isLtr) {
+            right = verse.words[j].rect!.right;
+          } else {
+            left = verse.words[j].rect!.left;
+          }
+
+          //check if we move to the next highlight
+          if (word.id == highlightEnd) {
+            highlightIdx++;
+            verse.highlightRects.add(Rect.fromLTRB(left!, top, right!, bottom));
+            top = null;
+          }
+
+          while (highlightIdx < highlightedWords.length) {
+            if (highlightedWords[highlightIdx].isDelete) {
+              highlightIdx++;
+            } else {
+              break;
+            }
+          }
+
+          if (highlightIdx < highlightedWords.length) {
+            Highlight h = highlightedWords[highlightIdx].highlight;
+            highlightStart = h.fromWord;
+            highlightEnd = h.toWord;
+            highlightStartVerse = (highlightStart ~/ 100) % 1000;
+            highlightEndVerse = (highlightEnd ~/ 100) % 1000;
+          } else {
+            highlightStart = null;
+            highlightEnd = null;
+          }
+        }
+      }
+
+      if (top != null) {
+        if (highlightedWords.isNotEmpty &&
+            highlightedWords.last.isActive &&
+            verse.verse == highlightEndVerse) {
+          verse.activeHighlightEndIdx = verse.highlightRects.length;
+        }
+
+        verse.highlightRects.add(Rect.fromLTRB(left!, top, right!, bottom!));
+        top = null;
+      }
+    }
+  }
 
   late List<VerseLayoutBlock> _verses;
   List<HebrewGreekWord> _words;
@@ -796,8 +932,12 @@ class RenderHebrewGreekText extends RenderBox {
   set highlightedWords(List<HighlightDetail> highlightedWords) {
     if (identical(_highlightedWords, highlightedWords)) return;
     _highlightedWords = highlightedWords;
-    _needsHighlightUpdate = true;
-    markNeedsLayout();
+    _updateHighlightBlocks(
+      _verseRenderer,
+      highlightedWords,
+      _textDirection == TextDirection.ltr,
+    );
+    markNeedsPaint();
   }
 
   bool _highlightModeEnabled;
@@ -815,6 +955,14 @@ class RenderHebrewGreekText extends RenderBox {
   set highlightSelectionAnchorWordId(int? value) {
     if (_highlightSelectionAnchorWordId == value) return;
     _highlightSelectionAnchorWordId = value;
+  }
+
+  WordRangeCallback? _onHighlightSelectionStarted;
+  WordRangeCallback? get onHighlightSelectionStarted =>
+      _onHighlightSelectionStarted;
+  set onHighlightSelectionStarted(WordRangeCallback? value) {
+    if (_onHighlightSelectionStarted == value) return;
+    _onHighlightSelectionStarted = value;
   }
 
   WordRangeCallback? _onHighlightSelectionChanged;
@@ -855,7 +1003,6 @@ class RenderHebrewGreekText extends RenderBox {
 
   // Cached layout data
   bool _needsTextPaintersUpdate = true;
-  bool _needsHighlightUpdate = false;
   bool _needsCheckboxesUpdate = false;
   bool _needsResetVersesRenderers = false;
   bool _checkboxesNeedFullUpdate = false;
@@ -865,9 +1012,7 @@ class RenderHebrewGreekText extends RenderBox {
   final List<VerseRenderer> _verseRenderer = [];
 
   void _updatePainters({bool duringLayout = false}) {
-    if (_needsTextPaintersUpdate ||
-        _needsResetVersesRenderers ||
-        _needsHighlightUpdate) {
+    if (_needsTextPaintersUpdate || _needsResetVersesRenderers) {
       _spacePainter = TextPainter(
         text: TextSpan(text: ' ', style: _textStyle),
         textDirection: _textDirection,
@@ -1027,6 +1172,8 @@ class RenderHebrewGreekText extends RenderBox {
       }
 
       verseRenderer.highlightRects.clear();
+      verseRenderer.activeHighlightStartIdx = null;
+      verseRenderer.activeHighlightEndIdx = null;
 
       verseRenderer.verseNumberPainter.text = TextSpan(
         text: '${verseRenderer.verse}',
@@ -1045,11 +1192,6 @@ class RenderHebrewGreekText extends RenderBox {
         );
         verseRenderer.bookmarkIconPainter!.layout();
       }
-    }
-
-    if (_needsHighlightUpdate) {
-      _updateBlocksHighlights(highlightedWords);
-      _needsHighlightUpdate = false;
     }
   }
 
@@ -1146,9 +1288,7 @@ class RenderHebrewGreekText extends RenderBox {
   }
 
   Size _performLayout(BoxConstraints constraints) {
-    if (_needsTextPaintersUpdate ||
-        _needsCheckboxesUpdate ||
-        _needsHighlightUpdate) {
+    if (_needsTextPaintersUpdate || _needsCheckboxesUpdate) {
       _updatePainters(duringLayout: true);
     }
     _lineMetrics.clear();
@@ -1175,7 +1315,9 @@ class RenderHebrewGreekText extends RenderBox {
     double? bottom, right;
 
     int? highlightStart;
-    int? hignlightEnd;
+    int? highlightStartVerse;
+    int? highlightEnd;
+    int? highlightEndVerse;
     int highlightIdx = 0;
 
     while (highlightIdx < highlightedWords.length) {
@@ -1189,7 +1331,9 @@ class RenderHebrewGreekText extends RenderBox {
     if (highlightIdx < highlightedWords.length) {
       Highlight h = highlightedWords[highlightIdx].highlight;
       highlightStart = h.fromWord;
-      hignlightEnd = h.toWord;
+      highlightEnd = h.toWord;
+      highlightStartVerse = (highlightStart ~/ 100) % 1000;
+      highlightEndVerse = (highlightEnd ~/ 100) % 1000;
     }
 
     for (int i = 0; i < _verseRenderer.length; i++) {
@@ -1220,9 +1364,20 @@ class RenderHebrewGreekText extends RenderBox {
         );
 
         if (highlightStart != null &&
-            hignlightEnd != null &&
+            highlightEnd != null &&
             highlightStart <= word.id &&
-            word.id <= hignlightEnd) {
+            word.id <= highlightEnd) {
+          if (highlightedWords[highlightIdx].isActive &&
+              verse.activeHighlightStartIdx == null &&
+              verse.verse == highlightStartVerse) {
+            verse.activeHighlightStartIdx = verse.highlightRects.length;
+          }
+
+          if (highlightedWords[highlightIdx].isActive &&
+              verse.verse == highlightEndVerse) {
+            verse.activeHighlightEndIdx = verse.highlightRects.length;
+          }
+
           //new line started, add save previous line
           if (currentLineWordIds.length == 1 || top == null) {
             if (top != null) {
@@ -1231,12 +1386,7 @@ class RenderHebrewGreekText extends RenderBox {
               );
             }
 
-            Rect r;
-            if (j == 0) {
-              r = verse.verseNumberRect!;
-            } else {
-              r = verse.words[j].rect!;
-            }
+            Rect r = verse.words[j].rect!;
 
             top = r.top;
             if (isLtr) {
@@ -1254,7 +1404,7 @@ class RenderHebrewGreekText extends RenderBox {
           }
 
           //check if we move to the next highlight
-          if (word.id == hignlightEnd) {
+          if (word.id == highlightEnd) {
             highlightIdx++;
             verse.highlightRects.add(Rect.fromLTRB(left!, top, right!, bottom));
             top = null;
@@ -1271,10 +1421,12 @@ class RenderHebrewGreekText extends RenderBox {
           if (highlightIdx < highlightedWords.length) {
             Highlight h = highlightedWords[highlightIdx].highlight;
             highlightStart = h.fromWord;
-            hignlightEnd = h.toWord;
+            highlightEnd = h.toWord;
+            highlightStartVerse = (highlightStart ~/ 100) % 1000;
+            highlightEndVerse = (highlightEnd ~/ 100) % 1000;
           } else {
             highlightStart = null;
-            hignlightEnd = null;
+            highlightEnd = null;
           }
         }
 
@@ -1293,6 +1445,12 @@ class RenderHebrewGreekText extends RenderBox {
       }
 
       if (top != null) {
+        if (highlightedWords.isNotEmpty &&
+            highlightedWords.last.isActive &&
+            verse.verse == highlightEndVerse) {
+          verse.activeHighlightEndIdx = verse.highlightRects.length;
+        }
+
         verse.highlightRects.add(Rect.fromLTRB(left!, top, right!, bottom!));
         top = null;
       }
@@ -1312,12 +1470,6 @@ class RenderHebrewGreekText extends RenderBox {
       crossAxisOffset + currentLineMaxHeight,
       currentLineWordIds,
     );
-
-    if (top != null) {
-      _verseRenderer[_verseRenderer.length - 1].highlightRects.add(
-        Rect.fromLTRB(left!, top, right!, bottom!),
-      );
-    }
 
     controller?._updateVerseRects(verseRectsMap);
 
@@ -1722,6 +1874,7 @@ class RenderHebrewGreekText extends RenderBox {
     if (event is PointerDownEvent) {
       _tapRecognizer.addPointer(event);
       _longPressRecognizer.addPointer(event);
+      _doubleTapRecognizer.addPointer(event);
       if (_highlightModeEnabled) {
         _panRecognizer.addPointer(event);
       }
@@ -1812,6 +1965,21 @@ class RenderHebrewGreekText extends RenderBox {
     }
   }
 
+  void _handleDoubleTapDown(TapDownDetails details) {
+    // Use our helper to find out what was under the user's finger.
+    final entry = _getHitTestEntryForOffset(details.localPosition);
+
+    if (highlightModeEnabled) {
+      _onHighlightSelectionCanceled?.call();
+    }
+
+    _dismissPopup();
+
+    if (entry is HebrewGreekWordHitTestEntry) {
+      _startHighlightSelection(entry.wordId);
+    }
+  }
+
   void _handlePanStart(DragStartDetails details) {
     if (!_highlightModeEnabled) return;
     final wordId = _getWordIdAtOffset(details.localPosition);
@@ -1853,6 +2021,10 @@ class RenderHebrewGreekText extends RenderBox {
     final anchor = _highlightSelectionAnchorWordId;
     if (anchor == null || wordId == null) return null;
     return anchor <= wordId ? (anchor, wordId) : (wordId, anchor);
+  }
+
+  void _startHighlightSelection(int wordId) {
+    _onHighlightSelectionStarted?.call(wordId, wordId);
   }
 
   void _updateHighlightSelection(int wordId, {bool complete = false}) {
@@ -1933,6 +2105,8 @@ class RenderHebrewGreekText extends RenderBox {
     final canvas = context.canvas;
     canvas.save();
     canvas.translate(offset.dx, offset.dy);
+
+    final isLtr = _textDirection == TextDirection.ltr;
 
     // --- 0. Paint audio highlight (Continuous Line Style) ---
     if (_highlightedVerse != null && _highlightColor != null) {
@@ -2030,7 +2204,7 @@ class RenderHebrewGreekText extends RenderBox {
       }
 
       if (_userHighlightColor != null && verse.highlightRects.isNotEmpty) {
-        final bookmarkPath = Path();
+        final highlightPath = Path();
         final paint = Paint()..color = _userHighlightColor!;
         for (Rect r in verse.highlightRects) {
           final displayRect = r.inflate(-0.2);
@@ -2039,10 +2213,45 @@ class RenderHebrewGreekText extends RenderBox {
             const Radius.circular(4.0),
           );
 
-          bookmarkPath.addRRect(rrect);
+          highlightPath.addRRect(rrect);
         }
 
-        canvas.drawPath(bookmarkPath, paint);
+        canvas.drawPath(highlightPath, paint);
+
+        int? startIdx, endIdx;
+        if (isLtr) {
+          startIdx = verse.activeHighlightStartIdx;
+          endIdx = verse.activeHighlightEndIdx;
+        } else {
+          startIdx = verse.activeHighlightEndIdx;
+          endIdx = verse.activeHighlightStartIdx;
+        }
+
+        if (startIdx != null && startIdx < verse.highlightRects.length) {
+          Color c = _userHighlightColor!.withAlpha(255);
+          final handlePaint = Paint()..color = c;
+
+          final startRect = verse.highlightRects[startIdx];
+          final startCenter = Offset(
+            startRect.topLeft.dx,
+            startRect.topLeft.dy + startRect.height / 2,
+          );
+
+          canvas.drawCircle(startCenter, startRect.height / 4, handlePaint);
+        }
+
+        if (endIdx != null && endIdx < verse.highlightRects.length) {
+          Color c = _userHighlightColor!.withAlpha(200);
+          final handlePaint = Paint()..color = c;
+
+          final endRect = verse.highlightRects[endIdx];
+          final endCenter = Offset(
+            endRect.topRight.dx,
+            endRect.topRight.dy + endRect.height / 2,
+          );
+
+          canvas.drawCircle(endCenter, endRect.height / 4, handlePaint);
+        }
       }
 
       if (verse.bookmarkIconPainter != null) {
@@ -2164,6 +2373,7 @@ class RenderHebrewGreekText extends RenderBox {
   @override
   void detach() {
     _tapRecognizer.dispose();
+    _doubleTapRecognizer.dispose();
     _longPressRecognizer.dispose();
     _panRecognizer.dispose();
     _popupDismissTimer?.cancel();

@@ -215,21 +215,19 @@ class _WordDetailsDialogState extends State<WordDetailsDialog> {
             );
           },
         ),
-        const SizedBox(width: 24),
-        IconButton(
-          icon: Icon(
-            widget.existingHighlightIdx == null ? Icons.edit : Icons.edit_off,
-            color: iconColor,
+        if (widget.existingHighlightIdx != null) const SizedBox(width: 24),
+        if (widget.existingHighlightIdx != null)
+          IconButton(
+            icon: Icon(Icons.edit_off, color: iconColor),
+            onPressed: () async {
+              await widget.onHighlightClick(
+                widget.wordId,
+                widget.existingHighlightIdx,
+              );
+              if (!context.mounted) return;
+              Navigator.of(context).pop();
+            },
           ),
-          onPressed: () async {
-            await widget.onHighlightClick(
-              widget.wordId,
-              widget.existingHighlightIdx,
-            );
-            if (!context.mounted) return;
-            Navigator.of(context).pop();
-          },
-        ),
         const SizedBox(width: 24),
         IconButton(
           icon: AnimatedSwitcher(
