@@ -88,28 +88,27 @@ class _BookmarksManagerPageState extends State<BookmarksManagerPage> {
   }
 
   Widget buildUsfm(List<UsfmLine> verseLines) {
-    return UsfmWidget(
-      verseLines: verseLines,
-      selectionController: ScriptureSelectionController(),
-      onFootnoteTapped: (footnote) {},
-      onWordTapped: (id) => log("Tapped word $id"),
-      onSelectionRequested: (wordId) {},
-      showHeadings: false,
-      showVerseNumbers: false,
-      footnoteMarkerStyle: null,
-      styleBuilder: (format) {
-        final baseStyle = UsfmParagraphStyle.usfmDefaults(
-          format: format,
-          baseStyle: Theme.of(
-            context,
-          ).textTheme.bodyMedium!.copyWith(fontSize: 20),
-        );
-        return baseStyle.copyWith(
-          verseNumberStyle: baseStyle.textStyle.copyWith(
-            color: Theme.of(context).colorScheme.primary,
-          ),
-        );
-      },
+    return IgnorePointer(
+      child: UsfmWidget(
+        verseLines: verseLines,
+        selectionController: ScriptureSelectionController(),
+        showHeadings: false,
+        showVerseNumbers: false,
+        footnoteMarkerStyle: null,
+        styleBuilder: (format) {
+          final baseStyle = UsfmParagraphStyle.usfmDefaults(
+            format: format,
+            baseStyle: Theme.of(
+              context,
+            ).textTheme.bodyMedium!.copyWith(fontSize: 20),
+          );
+          return baseStyle.copyWith(
+            verseNumberStyle: baseStyle.textStyle.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          );
+        },
+      ),
     );
   }
 }
