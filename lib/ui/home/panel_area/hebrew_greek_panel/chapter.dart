@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:studyapp/common/book_name.dart';
 import 'package:studyapp/common/word.dart';
 import 'package:studyapp/services/bookmarks/bookmark_model.dart';
 import 'package:studyapp/services/reading_session/rs_manager.dart';
+import 'package:studyapp/theme.dart' show darkPickerColors, lightPickerColors;
 import 'package:studyapp/ui/common/resource_ui_helper.dart';
 import 'package:studyapp/services/settings/user_settings.dart';
 import 'package:studyapp/ui/home/panel_area/common/infinite_scroll_view.dart';
@@ -229,6 +231,12 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
                             _onHighlightSelectionCompleted,
                         onHighlightSelectionCanceled:
                             _onHighlightSelectionCanceled,
+                        onHighlightColorSelected: _onHighightColorSelected,
+                        onHighlightSelectionCopy: _onHighightCopy,
+                        highlightPickerColors:
+                            Theme.of(context).brightness == Brightness.dark
+                            ? darkPickerColors
+                            : lightPickerColors,
                         controller: _textController,
                         textDirection: manager.isRtl(widget.bookId)
                             ? TextDirection.rtl
@@ -292,9 +300,6 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
                         highlightColor: Theme.of(
                           context,
                         ).colorScheme.primary.withValues(alpha: 0.25),
-                        userHighlightColor: Theme.of(
-                          context,
-                        ).colorScheme.primary.withValues(alpha: 0.4),
                       ),
                     ],
                   ),
@@ -470,10 +475,28 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
     await manager.saveHighlights(highlights);
   }
 
-  void _onHighlightSelectionCanceled() {
-    final highlights = manager.highlightedWords.value
-        .map((detail) => detail.copyWith(isActive: false))
-        .toList();
+  void _onHighlightSelectionCanceled(bool isDelete) {
+    final highlights = List.of(manager.highlightedWords.value);
+
+    int activeIndex = -1;
+
+    if (isDelete) {
+      activeIndex = highlights.indexWhere(
+        (detail) => detail.isActive && !detail.isDelete,
+      );
+    }
+
+    if (activeIndex != -1 && isDelete) {
+      highlights[activeIndex].isActive = false;
+
+      final highlight = highlights[activeIndex].highlight;
+
+      if (highlight.id != null) {
+        manager.deleteHighlight(highlight.id!);
+        highlights.removeAt(activeIndex);
+      }
+    }
+
     manager.highlightedWords.value = highlights;
     _finishHighlightSelection();
   }
@@ -484,6 +507,43 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
     manager.activeHighlightAnchorWordId = null;
   }
 
+  void _onHighightColorSelected(int colorIdx) {
+    final highlights = List.of(manager.highlightedWords.value);
+
+    final activeIndex = highlights.indexWhere(
+      (detail) => detail.isActive && !detail.isDelete,
+    );
+
+    if (activeIndex == -1) return;
+
+    highlights[activeIndex].highlight = highlights[activeIndex].highlight
+        .copyWith(colorIdx: colorIdx);
+    highlights[activeIndex].defaultColor = false;
+
+    manager.highlightedWords.value = highlights;
+  }
+
+  void _onHighightCopy() async {
+    if (!mounted) return;
+
+    final highlights = List.of(manager.highlightedWords.value);
+
+    final activeIndex = highlights.indexWhere(
+      (detail) => detail.isActive && !detail.isDelete,
+    );
+
+    if (activeIndex == -1) return;
+
+    HighlightDetail hd = highlights[activeIndex];
+
+    String text = await manager.getText(
+      hd.highlight.fromWord,
+      hd.highlight.toWord,
+    );
+
+    await Clipboard.setData(ClipboardData(text: text));
+  }
+
   List<HighlightDetail> _setActiveHighlightRange(
     int fromWordId,
     int toWordId, {
@@ -492,44 +552,61 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
   }) {
     final fromWord = min(fromWordId, toWordId);
     final toWord = max(fromWordId, toWordId);
-    final highlights = manager.highlightedWords.value
-        .map((detail) => detail.copyWith())
-        .toList();
+    final highlights = List.of(manager.highlightedWords.value);
+
+    if (createIfMissing) {
+      //this is a new highlight, try to check if its within an existing highlight
+      for (final detail in highlights) {
+        if (detail.isDelete) continue;
+        if (detail.highlight.fromWord > fromWord) break;
+
+        if (detail.highlight.toWord >= toWord) {
+          //this is a valid highligh
+          detail.isActive = true;
+          detail.defaultColor = false;
+          manager.highlightedWords.value = highlights;
+          return highlights;
+        }
+      }
+    }
 
     final activeIndex = highlights.indexWhere(
       (detail) => detail.isActive && !detail.isDelete,
     );
+    late final HighlightDetail activeDetail;
 
     if (activeIndex == -1) {
       if (!createIfMissing) return highlights;
 
-      highlights.add(
-        HighlightDetail(
-          highlight: Highlight(
-            date: DateTime.now(),
-            bookId: widget.bookId,
-            chapter: widget.chapter,
-            fromWord: fromWord,
-            toWord: toWord,
-          ),
-          isActive: isActive,
-          isChanged: true,
-        ),
-      );
-    } else {
-      final active = highlights[activeIndex];
-      highlights[activeIndex] = active.copyWith(
-        highlight: active.highlight.copyWith(
+      activeDetail = HighlightDetail(
+        highlight: Highlight(
+          date: DateTime.now(),
+          bookId: widget.bookId,
+          chapter: widget.chapter,
           fromWord: fromWord,
           toWord: toWord,
+          colorIdx: 0,
         ),
         isActive: isActive,
         isChanged: true,
       );
+      highlights.add(activeDetail);
+    } else {
+      activeDetail = highlights[activeIndex];
+      activeDetail.highlight = activeDetail.highlight.copyWith(
+        fromWord: fromWord,
+        toWord: toWord,
+      );
+      activeDetail.isChanged = true;
     }
 
     highlights.sort(_sortHighlights);
     mergeHighlights(highlights);
+
+    if (!activeDetail.isDelete) {
+      activeDetail.isActive = isActive;
+    }
+
     manager.highlightedWords.value = highlights;
     return highlights;
   }
@@ -565,6 +642,9 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
         Highlight highlight = main.highlight.copyWith(
           fromWord: min(main.highlight.fromWord, other.highlight.fromWord),
           toWord: max(main.highlight.toWord, other.highlight.toWord),
+          colorIdx: main.defaultColor
+              ? other.highlight.colorIdx
+              : main.highlight.colorIdx,
         );
 
         main.isChanged = true;

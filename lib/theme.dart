@@ -7,6 +7,22 @@ const _primaryColorDark = Color(0xFF00BFB2);
 // This is a darker shade of the original hue to ensure readability on white.
 const _primaryColorLight = Color(0xFF007F76);
 
+const List<Color> lightPickerColors = [
+  Color(0xFFF6E3B4),
+  Color(0xFFEBCBC4),
+  Color(0xFFD2E3D6),
+  Color(0xFFE1D6E8),
+];
+
+const List<Color> darkPickerColors = [
+  Color(0xFFE5A93C),
+  Color(0xFFC98A7E),
+  Color(0xFF7A9A82),
+  Color(0xFFA38BB5),
+];
+
+const pickerColorsCount = 4;
+
 const _fontFamily = 'sbl';
 
 final darkTheme = ThemeData(

@@ -59,6 +59,7 @@ class Highlight {
   final int chapter;
   final int fromWord;
   final int toWord;
+  final int colorIdx;
 
   Highlight({
     this.id,
@@ -67,6 +68,7 @@ class Highlight {
     required this.chapter,
     required this.fromWord,
     required this.toWord,
+    required this.colorIdx,
   });
 
   static const _undefined = Object();
@@ -78,6 +80,7 @@ class Highlight {
     int? chapter,
     int? fromWord,
     int? toWord,
+    int? colorIdx,
   }) {
     return Highlight(
       id: id == _undefined ? this.id : id as int?,
@@ -86,6 +89,7 @@ class Highlight {
       chapter: chapter ?? this.chapter,
       fromWord: fromWord ?? this.fromWord,
       toWord: toWord ?? this.toWord,
+      colorIdx: colorIdx ?? this.colorIdx,
     );
   }
 
@@ -97,6 +101,7 @@ class Highlight {
       chapter: map['chapter'],
       fromWord: map['from_word'],
       toWord: map['to_word'],
+      colorIdx: map['color_idx'],
     );
   }
 
@@ -108,6 +113,7 @@ class Highlight {
       'chapter': chapter,
       'from_word': fromWord,
       'to_word': toWord,
+      'color_idx': colorIdx,
     };
   }
 

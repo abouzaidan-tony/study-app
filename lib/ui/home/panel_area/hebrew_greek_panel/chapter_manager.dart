@@ -16,12 +16,14 @@ class HighlightDetail {
   bool isDelete;
   bool isActive;
   bool isChanged;
+  bool defaultColor;
 
   HighlightDetail({
     required this.highlight,
     this.isDelete = false,
     this.isActive = false,
     this.isChanged = false,
+    this.defaultColor = true,
   });
 
   HighlightDetail copyWith({
@@ -29,12 +31,14 @@ class HighlightDetail {
     bool? isDelete,
     bool? isActive,
     bool? isChanged,
+    bool? defaultColor,
   }) {
     return HighlightDetail(
       highlight: highlight ?? this.highlight,
       isDelete: isDelete ?? this.isDelete,
       isActive: isActive ?? this.isActive,
       isChanged: isChanged ?? this.isChanged,
+      defaultColor: defaultColor ?? this.defaultColor,
     );
   }
 
@@ -58,6 +62,7 @@ class HebrewGreekChapterManager {
   final highlightedWords = _SafeValueNotifier<List<HighlightDetail>>([]);
   final highlighModeEnabled = ValueNotifier<bool>(false);
   final temporaryHighlightIdx = ValueNotifier<int?>(null);
+
   int? activeHighlightAnchorWordId;
   bool _disposed = false;
   int _chapterLoadToken = 0;
@@ -103,7 +108,9 @@ class HebrewGreekChapterManager {
     final highlights = await _bookmarkDb.getHighlightsFor(bookId, chapter);
     List<HighlightDetail> highlightedWordsList = [];
     for (Highlight b in highlights) {
-      highlightedWordsList.add(HighlightDetail(highlight: b));
+      highlightedWordsList.add(
+        HighlightDetail(highlight: b, defaultColor: false),
+      );
     }
     if (_disposed) return;
     _dbHighlightedWords = highlightedWordsList;
@@ -131,7 +138,11 @@ class HebrewGreekChapterManager {
       }
 
       savedHighlights.add(
-        detail.copyWith(highlight: highlight, isChanged: false),
+        detail.copyWith(
+          highlight: highlight,
+          isChanged: false,
+          defaultColor: false,
+        ),
       );
     }
 
@@ -289,6 +300,30 @@ class HebrewGreekChapterManager {
     await _bookmarkDb.deleteBookmarkByReference(bookId, chapter, verse);
 
     bookmarkedVerses.value = bookmarks;
+  }
+
+  Future<String> getText(int fromWordId, int toWordId) async {
+    if (_disposed) return '';
+
+    List<HebrewGreekWord> words = await _hebrewGreekDb.wordsForBound(
+      fromWordId,
+      toWordId,
+    );
+
+    if (words.isEmpty) return '';
+
+    final buffer = StringBuffer();
+    const maqaph = '־';
+
+    for (int i = 0; i < words.length; i++) {
+      final text = words[i].text;
+      buffer.write(text);
+
+      if (i < words.length - 1 && !text.endsWith(maqaph)) {
+        buffer.write(' ');
+      }
+    }
+    return buffer.toString();
   }
 
   void dispose() {

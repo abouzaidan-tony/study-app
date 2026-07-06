@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:developer';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -116,7 +115,7 @@ class VerseRenderer {
   TextPainter? bookmarkIconPainter;
   Size? checkboxSize;
   List<WordRenderer> words;
-  List<Rect> highlightRects;
+  List<(Rect, int)> highlightRects;
   int? activeHighlightStartIdx;
   int? activeHighlightEndIdx;
 
@@ -124,6 +123,13 @@ class VerseRenderer {
     : words = [],
       highlightRects = [],
       readingCount = 0;
+}
+
+class CustomPopupButton {
+  final TextPainter textPainter;
+  final VoidCallback? callback;
+
+  CustomPopupButton(this.textPainter, this.callback);
 }
 
 /// A widget that renders Hebrew and Greek text with custom layout and styling.
@@ -159,7 +165,6 @@ class HebrewGreekText extends LeafRenderObjectWidget {
     this.flashColor,
     this.highlightedVerse,
     this.highlightColor,
-    this.userHighlightColor,
     required this.verseLayout,
     required this.readingModeEnabled,
     this.checkedVerses,
@@ -175,6 +180,9 @@ class HebrewGreekText extends LeafRenderObjectWidget {
     this.onHighlightSelectionChanged,
     this.onHighlightSelectionCompleted,
     this.onHighlightSelectionCanceled,
+    this.onHighlightSelectionCopy,
+    this.onHighlightColorSelected,
+    required this.highlightPickerColors,
   });
 
   /// The words that will rendered in the text layout
@@ -230,9 +238,6 @@ class HebrewGreekText extends LeafRenderObjectWidget {
   /// The background color to use for a highlighted verse
   final Color? highlightColor;
 
-  /// The background color to use for a bookmarked verse
-  final Color? userHighlightColor;
-
   /// The verse layout to use for the text
   final VerseLayout verseLayout;
 
@@ -253,7 +258,10 @@ class HebrewGreekText extends LeafRenderObjectWidget {
   final WordRangeCallback? onHighlightSelectionStarted;
   final WordRangeCallback? onHighlightSelectionChanged;
   final WordRangeCallback? onHighlightSelectionCompleted;
-  final VoidCallback? onHighlightSelectionCanceled;
+  final ValueChanged<bool>? onHighlightSelectionCanceled;
+  final VoidCallback? onHighlightSelectionCopy;
+  final List<Color> highlightPickerColors;
+  final ValueChanged<int>? onHighlightColorSelected;
 
   @override
   RenderHebrewGreekText createRenderObject(BuildContext context) {
@@ -299,6 +307,9 @@ class HebrewGreekText extends LeafRenderObjectWidget {
       onHighlightSelectionChanged: onHighlightSelectionChanged,
       onHighlightSelectionCompleted: onHighlightSelectionCompleted,
       onHighlightSelectionCanceled: onHighlightSelectionCanceled,
+      onHighlightSelectionCopy: onHighlightSelectionCopy,
+      highlightPickerColors: highlightPickerColors,
+      onHighlightColorSelected: onHighlightColorSelected,
       flashColor:
           flashColor ??
           effectiveVerseNumberStyle?.color?.withValues(alpha: 0.4) ??
@@ -307,10 +318,6 @@ class HebrewGreekText extends LeafRenderObjectWidget {
       highlightColor:
           highlightColor ??
           effectiveVerseNumberStyle?.color?.withValues(alpha: 0.4) ??
-          const Color(0xFFFFFFFF),
-      userHighlightColor:
-          userHighlightColor ??
-          effectiveVerseNumberStyle?.color?.withValues(alpha: 0.5) ??
           const Color(0xFFFFFFFF),
       primaryColor: Theme.of(context).colorScheme.primary,
     );
@@ -365,6 +372,9 @@ class HebrewGreekText extends LeafRenderObjectWidget {
       ..onHighlightSelectionChanged = onHighlightSelectionChanged
       ..onHighlightSelectionCompleted = onHighlightSelectionCompleted
       ..onHighlightSelectionCanceled = onHighlightSelectionCanceled
+      ..onHighlightSelectionCopy = onHighlightSelectionCopy
+      ..onHighlightColorSelected = onHighlightColorSelected
+      ..highlightPickerColors = highlightPickerColors
       ..readingModeEnabled = readingModeEnabled
       ..flashColor =
           flashColor ??
@@ -375,11 +385,7 @@ class HebrewGreekText extends LeafRenderObjectWidget {
           highlightColor ??
           effectiveVerseNumberStyle?.color?.withValues(alpha: 0.4) ??
           const Color(0xFFFFFFFF)
-      ..primaryColor = Theme.of(context).colorScheme.primary
-      ..userHighlightColor =
-          userHighlightColor ??
-          effectiveVerseNumberStyle?.color?.withValues(alpha: 0.5) ??
-          const Color(0xFFFFFFFF);
+      ..primaryColor = Theme.of(context).colorScheme.primary;
   }
 
   @override
@@ -451,7 +457,6 @@ class RenderHebrewGreekText extends RenderBox {
     required Color flashColor,
     int? highlightedVerse,
     Color? highlightColor,
-    Color? userHighlightColor,
     required VerseLayout verseLayout,
     required bool readingModeEnabled,
     Map<int, int>? checkedVerses,
@@ -466,7 +471,10 @@ class RenderHebrewGreekText extends RenderBox {
     WordRangeCallback? onHighlightSelectionStarted,
     WordRangeCallback? onHighlightSelectionChanged,
     WordRangeCallback? onHighlightSelectionCompleted,
-    VoidCallback? onHighlightSelectionCanceled,
+    ValueChanged<bool>? onHighlightSelectionCanceled,
+    VoidCallback? onHighlightSelectionCopy,
+    required List<Color> highlightPickerColors,
+    ValueChanged<int>? onHighlightColorSelected,
     required Color primaryColor,
   }) : _words = words,
        _verses = _buildBlocks(words),
@@ -485,7 +493,6 @@ class RenderHebrewGreekText extends RenderBox {
        _flashColor = flashColor,
        _highlightedVerse = highlightedVerse,
        _highlightColor = highlightColor,
-       _userHighlightColor = userHighlightColor,
        _verseLayout = verseLayout,
        _readingModeEnabled = readingModeEnabled,
        _bookmarkedVerses = bookmarkedVerses,
@@ -496,6 +503,9 @@ class RenderHebrewGreekText extends RenderBox {
        _onHighlightSelectionChanged = onHighlightSelectionChanged,
        _onHighlightSelectionCompleted = onHighlightSelectionCompleted,
        _onHighlightSelectionCanceled = onHighlightSelectionCanceled,
+       _onHighlightSelectionCopy = onHighlightSelectionCopy,
+       _highlightPickerColors = highlightPickerColors,
+       _onHighlightColorSelected = onHighlightColorSelected,
        _checkedVerses = checkedVerses == null
            ? null
            : Map<int, int>.unmodifiable(checkedVerses),
@@ -537,6 +547,8 @@ class RenderHebrewGreekText extends RenderBox {
   late final DoubleTapGestureRecognizer _doubleTapRecognizer;
   late final LongPressGestureRecognizer _longPressRecognizer;
   late final PanGestureRecognizer _panRecognizer;
+
+  final List<CustomPopupButton> _customButtonsPainters = [];
 
   int? _flashedWordId;
   Timer? _flashTimer;
@@ -590,6 +602,7 @@ class RenderHebrewGreekText extends RenderBox {
     int? highlightStartVerse;
     int? highlightEnd;
     int? highlightEndVerse;
+    int highlightVerseColor = 0;
     int highlightIdx = 0;
 
     while (highlightIdx < highlightedWords.length) {
@@ -606,6 +619,7 @@ class RenderHebrewGreekText extends RenderBox {
       highlightEnd = h.toWord;
       highlightStartVerse = (highlightStart ~/ 100) % 1000;
       highlightEndVerse = (highlightEnd ~/ 100) % 1000;
+      highlightVerseColor = h.colorIdx;
     }
 
     for (int i = 0; i < verseRenderer.length; i++) {
@@ -641,9 +655,10 @@ class RenderHebrewGreekText extends RenderBox {
           //new line started, add save previous line
           if (isNewLine || top == null) {
             if (top != null) {
-              verse.highlightRects.add(
+              verse.highlightRects.add((
                 Rect.fromLTRB(left!, top, right!, bottom!),
-              );
+                highlightVerseColor,
+              ));
             }
 
             Rect r = verse.words[j].rect!;
@@ -665,8 +680,12 @@ class RenderHebrewGreekText extends RenderBox {
 
           //check if we move to the next highlight
           if (word.id == highlightEnd) {
+            verse.highlightRects.add((
+              Rect.fromLTRB(left!, top, right!, bottom),
+              highlightVerseColor,
+            ));
+
             highlightIdx++;
-            verse.highlightRects.add(Rect.fromLTRB(left!, top, right!, bottom));
             top = null;
           }
 
@@ -684,6 +703,7 @@ class RenderHebrewGreekText extends RenderBox {
             highlightEnd = h.toWord;
             highlightStartVerse = (highlightStart ~/ 100) % 1000;
             highlightEndVerse = (highlightEnd ~/ 100) % 1000;
+            highlightVerseColor = h.colorIdx;
           } else {
             highlightStart = null;
             highlightEnd = null;
@@ -698,7 +718,10 @@ class RenderHebrewGreekText extends RenderBox {
           verse.activeHighlightEndIdx = verse.highlightRects.length;
         }
 
-        verse.highlightRects.add(Rect.fromLTRB(left!, top, right!, bottom!));
+        verse.highlightRects.add((
+          Rect.fromLTRB(left!, top, right!, bottom!),
+          highlightVerseColor,
+        ));
         top = null;
       }
     }
@@ -830,6 +853,21 @@ class RenderHebrewGreekText extends RenderBox {
     }
   }
 
+  List<Color> _highlightPickerColors;
+  List<Color> get highlightPickerColors => _highlightPickerColors;
+  set highlightPickerColors(List<Color> value) {
+    if (_highlightPickerColors == value) return;
+    _highlightPickerColors = value;
+  }
+
+  bool _colorPickerVisible = false;
+  ValueChanged<int>? _onHighlightColorSelected;
+  ValueChanged<int>? get onHighlightColorSelected => _onHighlightColorSelected;
+  set onHighlightColorSelected(ValueChanged<int>? value) {
+    if (_onHighlightColorSelected == value) return;
+    _onHighlightColorSelected = value;
+  }
+
   TextStyle _popupTextStyle;
   TextStyle get popupTextStyle => _popupTextStyle;
   set popupTextStyle(TextStyle value) {
@@ -913,14 +951,6 @@ class RenderHebrewGreekText extends RenderBox {
     markNeedsPaint();
   }
 
-  Color? _userHighlightColor;
-  Color? get userHighlightColor => _userHighlightColor;
-  set userHighlightColor(Color? value) {
-    if (_userHighlightColor == value) return;
-    _userHighlightColor = value;
-    markNeedsPaint();
-  }
-
   Set<int> _bookmarkedVerses;
   Set<int> get bookmarkedVerses => _bookmarkedVerses;
   set bookmarkedVerses(Set<int> verses) {
@@ -959,6 +989,8 @@ class RenderHebrewGreekText extends RenderBox {
   set highlightSelectionAnchorWordId(int? value) {
     if (_highlightSelectionAnchorWordId == value) return;
     _highlightSelectionAnchorWordId = value;
+    _colorPickerVisible = (value != null); // show when anchor is set
+    markNeedsPaint();
   }
 
   WordRangeCallback? _onHighlightSelectionStarted;
@@ -985,12 +1017,23 @@ class RenderHebrewGreekText extends RenderBox {
     _onHighlightSelectionCompleted = value;
   }
 
-  VoidCallback? _onHighlightSelectionCanceled;
-  VoidCallback? get onHighlightSelectionCanceled =>
+  ValueChanged<bool>? _onHighlightSelectionCanceled;
+  ValueChanged<bool>? get onHighlightSelectionCanceled =>
       _onHighlightSelectionCanceled;
-  set onHighlightSelectionCanceled(VoidCallback? value) {
+  set onHighlightSelectionCanceled(ValueChanged<bool>? value) {
     if (_onHighlightSelectionCanceled == value) return;
     _onHighlightSelectionCanceled = value;
+  }
+
+  void _onHighlightSelectionCleared() {
+    _onHighlightSelectionCanceled?.call(true);
+  }
+
+  VoidCallback? _onHighlightSelectionCopy;
+  VoidCallback? get onHighlightSelectionCopy => _onHighlightSelectionCopy;
+  set onHighlightSelectionCopy(VoidCallback? value) {
+    if (_onHighlightSelectionCopy == value) return;
+    _onHighlightSelectionCopy = value;
   }
 
   /// Clears all popup state and requests a repaint to make it disappear.
@@ -1392,9 +1435,10 @@ class RenderHebrewGreekText extends RenderBox {
           //new line started, add save previous line
           if (currentLineWordIds.length == 1 || top == null) {
             if (top != null) {
-              verse.highlightRects.add(
+              verse.highlightRects.add((
                 Rect.fromLTRB(left!, top, right!, bottom!),
-              );
+                highlightedWords[highlightIdx].highlight.colorIdx,
+              ));
             }
 
             Rect r = verse.words[j].rect!;
@@ -1416,8 +1460,11 @@ class RenderHebrewGreekText extends RenderBox {
 
           //check if we move to the next highlight
           if (word.id == highlightEnd) {
+            verse.highlightRects.add((
+              Rect.fromLTRB(left!, top, right!, bottom),
+              highlightedWords[highlightIdx].highlight.colorIdx,
+            ));
             highlightIdx++;
-            verse.highlightRects.add(Rect.fromLTRB(left!, top, right!, bottom));
             top = null;
           }
 
@@ -1462,7 +1509,10 @@ class RenderHebrewGreekText extends RenderBox {
           verse.activeHighlightEndIdx = verse.highlightRects.length;
         }
 
-        verse.highlightRects.add(Rect.fromLTRB(left!, top, right!, bottom!));
+        verse.highlightRects.add((
+          Rect.fromLTRB(left!, top, right!, bottom!),
+          highlightedWords.last.highlight.colorIdx,
+        ));
         top = null;
       }
 
@@ -1908,11 +1958,17 @@ class RenderHebrewGreekText extends RenderBox {
     // Use our helper to find out what was under the user's finger.
     final entry = _getHitTestEntryForOffset(details.localPosition);
 
+    if (_colorPickerVisible) {
+      final proceed = _colorPickerHitTest(details.localPosition);
+      _colorPickerVisible = false;
+      if (!proceed) return;
+    }
+
     if (_highlightModeEnabled) {
       if (entry is HebrewGreekWordHitTestEntry) {
         _updateHighlightSelection(entry.wordId, complete: true);
       } else {
-        _onHighlightSelectionCanceled?.call();
+        _onHighlightSelectionCanceled?.call(false);
       }
       _dismissPopup();
       return;
@@ -1981,12 +2037,41 @@ class RenderHebrewGreekText extends RenderBox {
     final entry = _getHitTestEntryForOffset(details.localPosition);
 
     if (highlightModeEnabled) {
-      _onHighlightSelectionCanceled?.call();
+      _onHighlightSelectionCanceled?.call(false);
     }
 
     _dismissPopup();
 
+    _customButtonsPainters.clear();
+
     if (entry is HebrewGreekWordHitTestEntry) {
+      final anchorRect = getWordRect(entry.wordId);
+
+      if (anchorRect != null) {
+        final painter = TextPainter(
+          text: TextSpan(text: "Clear", style: _popupTextStyle),
+          textDirection: TextDirection.ltr,
+        )..layout();
+
+        _customButtonsPainters.add(
+          CustomPopupButton(painter, _onHighlightSelectionCleared),
+        );
+
+        final painter2 = TextPainter(
+          text: TextSpan(text: "Copy", style: _popupTextStyle),
+          textDirection: TextDirection.ltr,
+        )..layout();
+
+        _customButtonsPainters.add(
+          CustomPopupButton(painter2, _onHighlightSelectionCopy),
+        );
+
+        final pickerRect = _getColorPickerRect(anchorRect);
+        final globalTopLeft = localToGlobal(pickerRect.topLeft);
+        final globalPopupRect = globalTopLeft & pickerRect.size;
+        onPopupShown?.call(globalPopupRect);
+      }
+
       _startHighlightSelection(entry.wordId);
     }
   }
@@ -2003,7 +2088,9 @@ class RenderHebrewGreekText extends RenderBox {
     if (!_highlightModeEnabled || !_isUpdatingHighlightSelection) return;
     final wordId = _getWordIdAtOffset(details.localPosition);
     if (wordId == null) return;
+    _colorPickerVisible = false;
     _updateHighlightSelection(wordId);
+    markNeedsPaint();
   }
 
   void _handlePanEnd(DragEndDetails details) {
@@ -2011,7 +2098,7 @@ class RenderHebrewGreekText extends RenderBox {
     _isUpdatingHighlightSelection = false;
     final range = _highlightSelectionRange(_lastHighlightSelectionWordId);
     if (range == null) {
-      _onHighlightSelectionCanceled?.call();
+      _onHighlightSelectionCanceled?.call(true);
       return;
     }
     _onHighlightSelectionCompleted?.call(range.$1, range.$2);
@@ -2214,20 +2301,20 @@ class RenderHebrewGreekText extends RenderBox {
         _paintCheckboxes(canvas, verse);
       }
 
-      if (_userHighlightColor != null && verse.highlightRects.isNotEmpty) {
-        final highlightPath = Path();
-        final paint = Paint()..color = _userHighlightColor!;
-        for (Rect r in verse.highlightRects) {
+      if (verse.highlightRects.isNotEmpty) {
+        for ((Rect, int) entry in verse.highlightRects) {
+          Rect r = entry.$1;
+          int idx = entry.$2;
+          final paint = Paint()..color = highlightPickerColors[idx];
+
           final displayRect = r.inflate(-0.2);
           final rrect = RRect.fromRectAndRadius(
             displayRect,
             const Radius.circular(4.0),
           );
 
-          highlightPath.addRRect(rrect);
+          canvas.drawRRect(rrect, paint);
         }
-
-        canvas.drawPath(highlightPath, paint);
 
         int? startIdx, endIdx;
         if (isLtr) {
@@ -2239,10 +2326,11 @@ class RenderHebrewGreekText extends RenderBox {
         }
 
         if (startIdx != null && startIdx < verse.highlightRects.length) {
-          Color c = _userHighlightColor!.withAlpha(255);
+          int idx = verse.highlightRects[startIdx].$2;
+          Color c = highlightPickerColors[idx].withAlpha(255);
           final handlePaint = Paint()..color = c;
 
-          final startRect = verse.highlightRects[startIdx];
+          final startRect = verse.highlightRects[startIdx].$1;
           final startCenter = Offset(
             startRect.topLeft.dx,
             startRect.topLeft.dy + startRect.height / 2,
@@ -2252,10 +2340,11 @@ class RenderHebrewGreekText extends RenderBox {
         }
 
         if (endIdx != null && endIdx < verse.highlightRects.length) {
-          Color c = _userHighlightColor!.withAlpha(200);
+          int idx = verse.highlightRects[endIdx].$2;
+          Color c = highlightPickerColors[idx].withAlpha(255);
           final handlePaint = Paint()..color = c;
 
-          final endRect = verse.highlightRects[endIdx];
+          final endRect = verse.highlightRects[endIdx].$1;
           final endCenter = Offset(
             endRect.topRight.dx,
             endRect.topRight.dy + endRect.height / 2,
@@ -2300,12 +2389,160 @@ class RenderHebrewGreekText extends RenderBox {
           _paintPopup(canvas, rect);
         }
 
+        if (_highlightSelectionAnchorWordId != null &&
+            word.word.id == _highlightSelectionAnchorWordId &&
+            _colorPickerVisible) {
+          _paintColorPicker(canvas, rect);
+        }
+
         // 2.2.3 Paint the word
         word.painter.paint(canvas, word.rect!.topLeft);
       }
     }
 
     canvas.restore();
+  }
+
+  Rect _getColorPickerRect(Rect anchorWordRect) {
+    int swatchCount = _highlightPickerColors.length;
+    final double swatchDiameter = kPickerSwatchRadius * 2;
+
+    final double customButtonsWidth = _customButtonsPainters.fold<double>(
+      0,
+      (sum, entry) => sum + entry.textPainter.size.width,
+    );
+
+    final double customButtonsMaxHeight = _customButtonsPainters.fold<double>(
+      0,
+      (max, entry) => math.max(max, entry.textPainter.size.width),
+    );
+
+    final double contentWidth =
+        swatchCount * (swatchDiameter + kPickerSwatchSpacing) +
+        (2 * _customButtonsPainters.length - 1) * kPickerSwatchSpacing +
+        customButtonsWidth;
+
+    final double totalWidth = contentWidth + kPickerPadding * 2;
+    final double totalHeight = math.max(
+      swatchDiameter + kPickerPadding * 2,
+      customButtonsMaxHeight,
+    );
+
+    double left = anchorWordRect.center.dx - totalWidth / 2;
+    double top = anchorWordRect.top - totalHeight - 8.0;
+
+    left = left.clamp(0.0, size.width - totalWidth);
+
+    return Rect.fromLTWH(left, top, totalWidth, totalHeight);
+  }
+
+  static const double kPickerSwatchRadius = 14.0;
+  static const double kPickerSwatchSpacing = 10.0;
+  static const double kPickerPadding = 10.0;
+  static const double kPickerCornerRadius = 12.0;
+
+  bool _colorPickerHitTest(Offset position) {
+    if (!_colorPickerVisible || _highlightSelectionAnchorWordId == null) {
+      return true;
+    }
+    final anchorRect = getWordRect(_highlightSelectionAnchorWordId!);
+    if (anchorRect == null) return true;
+
+    final pickerRect = _getColorPickerRect(anchorRect);
+    if (!pickerRect.contains(position)) return true;
+
+    const double swatchDiameter = kPickerSwatchRadius * 2;
+    double cx = pickerRect.left + kPickerPadding + kPickerSwatchRadius;
+    final double cy = pickerRect.top + kPickerPadding + kPickerSwatchRadius;
+
+    for (int i = 0; i < _highlightPickerColors.length; i++) {
+      final center = Offset(cx, cy);
+      if ((position - center).distance <= kPickerSwatchRadius + 4) {
+        _onHighlightColorSelected?.call(i);
+        return false;
+      }
+      cx += swatchDiameter + kPickerSwatchSpacing;
+    }
+
+    for (CustomPopupButton entry in _customButtonsPainters) {
+      if (position.dx >= cx && position.dx <= cx + entry.textPainter.width) {
+        entry.callback?.call();
+        return false;
+      }
+
+      cx += entry.textPainter.width + kPickerSwatchSpacing;
+    }
+
+    return true;
+  }
+
+  void _paintColorPicker(Canvas canvas, Rect anchorWordRect) {
+    final pickerRect = _getColorPickerRect(anchorWordRect);
+
+    final bgPaint = Paint()..color = _popupBackgroundColor;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        pickerRect,
+        const Radius.circular(kPickerCornerRadius),
+      ),
+      bgPaint,
+    );
+
+    const double swatchDiameter = kPickerSwatchRadius * 2;
+    double cx = pickerRect.left + kPickerPadding + kPickerSwatchRadius;
+    final double cy = pickerRect.top + kPickerPadding + kPickerSwatchRadius;
+
+    // Draw color swatches
+    for (final color in _highlightPickerColors) {
+      final center = Offset(cx, cy);
+
+      final swatchPaint = Paint()..color = color;
+      canvas.drawCircle(center, kPickerSwatchRadius, swatchPaint);
+
+      final ringPaint = Paint()
+        ..color = Colors.white.withValues(alpha: 0.5)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5;
+      canvas.drawCircle(center, kPickerSwatchRadius, ringPaint);
+
+      cx += swatchDiameter + kPickerSwatchSpacing;
+    }
+
+    cx -= swatchDiameter / 2;
+
+    final separatorPaint = Paint()
+      ..color = const Color(0x66FFFFFF)
+      ..strokeWidth = 1.0;
+
+    for (CustomPopupButton entry in _customButtonsPainters) {
+      canvas.drawLine(
+        Offset(cx, pickerRect.top + 6.0),
+        Offset(cx, pickerRect.bottom - 6.0),
+        separatorPaint,
+      );
+
+      cx += kPickerSwatchSpacing;
+
+      double textDy =
+          pickerRect.top +
+          (pickerRect.height - entry.textPainter.height) / 2 +
+          2;
+
+      entry.textPainter.paint(canvas, Offset(cx, textDy));
+
+      cx += entry.textPainter.width + kPickerSwatchSpacing;
+    }
+
+    final anchorX = anchorWordRect.center.dx.clamp(
+      pickerRect.left + kPickerCornerRadius,
+      pickerRect.right - kPickerCornerRadius,
+    );
+    final caretPath = Path()
+      ..moveTo(anchorX - 6, pickerRect.bottom)
+      ..lineTo(anchorX + 6, pickerRect.bottom)
+      ..lineTo(anchorX, pickerRect.bottom + 6)
+      ..close();
+    canvas.drawPath(caretPath, Paint()..color = _popupBackgroundColor);
   }
 
   void _paintCheckboxes(Canvas canvas, VerseRenderer verse) {

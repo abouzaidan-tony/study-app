@@ -25,7 +25,8 @@ create table highlight (
     book_id int not null,
     chapter int not null,
     from_word int not null,
-    to_word int not null
+    to_word int not null,
+    color_idx int not null
 );
 
 CREATE INDEX idx_highlight_book_chapter

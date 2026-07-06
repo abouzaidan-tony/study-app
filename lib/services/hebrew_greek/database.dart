@@ -139,7 +139,8 @@ class HebrewGreekDatabase {
   }
 
   Future<String?> strongsCodeRoot(String strongsCode) async {
-    final String sql = '''
+    final String sql =
+        '''
     SELECT ${HebrewGreekSchema.strongsColRoot}
     FROM ${HebrewGreekSchema.strongsTable}
     WHERE ${HebrewGreekSchema.strongsColCode} = ?
@@ -171,6 +172,18 @@ class HebrewGreekDatabase {
         reference.chapter * chapterMultiplier +
         (reference.verse + 1) * verseMultiplier;
 
+    return wordsForBound(
+      lowerBound,
+      upperBound,
+      includeStrongs: includeStrongs,
+    );
+  }
+
+  Future<List<HebrewGreekWord>> wordsForBound(
+    int lowerBound,
+    int upperBound, {
+    bool includeStrongs = false,
+  }) async {
     final sql = StringBuffer();
     sql.write(
       'SELECT v.${HebrewGreekSchema.versesColId}, '
@@ -272,7 +285,8 @@ class HebrewGreekDatabase {
     // e.g., Genesis 1:1 -> 1001001
     final verseIdCalc = 'v.${HebrewGreekSchema.versesColId} / 100';
 
-    final sql = '''
+    final sql =
+        '''
     SELECT
       $verseIdCalc AS verse_id
     FROM
@@ -327,7 +341,8 @@ class HebrewGreekDatabase {
 
     // The SQL query now joins the verses and text tables, but filters the
     // WHERE clause on the 'no_punctuation' column for a flexible match.
-    const String sql = '''
+    const String sql =
+        '''
       SELECT v.${HebrewGreekSchema.versesColId}
       FROM ${HebrewGreekSchema.versesTable} AS v
       INNER JOIN ${HebrewGreekSchema.textTable} AS t 
