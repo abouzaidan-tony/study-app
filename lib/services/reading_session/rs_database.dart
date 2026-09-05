@@ -25,7 +25,7 @@ class ReadingSessionBackupInfo {
 class ReadingSessionDatabase {
   static const _databaseName = 'reading_session.db';
   static const _databaseVersion = 3;
-  static const _backupFormatVersion = 1;
+  static const _backupFormatVersion = 2;
   static const _backupDirectoryName = 'backups';
   static const _backupFilePrefix = 'reading_session_';
 
@@ -92,6 +92,16 @@ class ReadingSessionDatabase {
     await batch.commit(noResult: true);
   }
 
+  Future<void> __executeSqlBatch(Batch batch, String sql) async {
+    final statements = sql
+        .split(RegExp(r';\s*\n'))
+        .where((s) => s.trim().isNotEmpty);
+
+    for (final statement in statements) {
+      batch.execute(statement);
+    }
+  }
+
   Future<String> createBackup() async {
     await init();
     final backupDir = await _getBackupDirectory();
@@ -126,6 +136,11 @@ class ReadingSessionDatabase {
       'format_version': _backupFormatVersion,
       'created_at': DateTime.now().toIso8601String(),
       'tables': {
+        'reading_plan': await _database.query('reading_plan', orderBy: 'id'),
+        'reading_plan_book': await _database.query(
+          'reading_plan_book',
+          orderBy: 'id',
+        ),
         'rs_daily_log': await _database.query('rs_daily_log', orderBy: 'id'),
         'rs_log': await _database.query('rs_log', orderBy: 'id'),
         'rs_stats': await _database.query('rs_stats', orderBy: 'id'),
@@ -190,6 +205,61 @@ class ReadingSessionDatabase {
       throw const FormatException('Backup is missing table data.');
     }
 
+    final version = raw['format_version'];
+    if (version is! int) {
+      throw const FormatException('Backup is missing version data.');
+    }
+
+    if (version == 1) {
+      await restoreBackupJson1(tables);
+    } else {}
+  }
+
+  Future<void> restoreBackupJson1(Map<String, dynamic> tables) async {
+    final dailyLogRows = _parseBackupRows(tables['rs_daily_log']);
+    final logRows = _parseBackupRows(tables['rs_log']);
+    final statsRows = _parseBackupRows(tables['rs_stats']);
+    final bookProgressRows = _parseBackupRows(tables['rs_book_progress']);
+
+    final file = 'assets/schemas/reading_session_data.sql';
+    final sql = await rootBundle.loadString(file);
+
+    await _database.transaction((txn) async {
+      final batch = txn.batch();
+
+      batch.delete('reading_plan');
+      batch.delete('reading_plan_book');
+      batch.delete('rs_log');
+      batch.delete('rs_stats');
+      batch.delete('rs_book_progress');
+      batch.delete('rs_daily_log');
+
+      await __executeSqlBatch(batch, sql);
+
+      for (final row in dailyLogRows) {
+        row['reading_plan_id'] = 1;
+        batch.insert('rs_daily_log', row);
+      }
+      for (final row in logRows) {
+        row['reading_plan_id'] = 1;
+        batch.insert('rs_log', row);
+      }
+      for (final row in statsRows) {
+        row['reading_plan_id'] = 1;
+        batch.insert('rs_stats', row);
+      }
+      for (final row in bookProgressRows) {
+        row['reading_plan_id'] = 1;
+        batch.insert('rs_book_progress', row);
+      }
+
+      await batch.commit(noResult: true);
+    });
+  }
+
+  Future<void> restoreBackupJson2(Map<String, dynamic> tables) async {
+    final readingPlanRows = _parseBackupRows(tables['reading_plan']);
+    final readingPlanBookRows = _parseBackupRows(tables['reading_plan_book']);
     final dailyLogRows = _parseBackupRows(tables['rs_daily_log']);
     final logRows = _parseBackupRows(tables['rs_log']);
     final statsRows = _parseBackupRows(tables['rs_stats']);
@@ -198,11 +268,19 @@ class ReadingSessionDatabase {
     await _database.transaction((txn) async {
       final batch = txn.batch();
 
+      batch.delete('reading_plan');
+      batch.delete('reading_plan_book');
       batch.delete('rs_log');
       batch.delete('rs_stats');
       batch.delete('rs_book_progress');
       batch.delete('rs_daily_log');
 
+      for (final row in readingPlanRows) {
+        batch.insert('reading_plan', row);
+      }
+      for (final row in readingPlanBookRows) {
+        batch.insert('reading_plan_book', row);
+      }
       for (final row in dailyLogRows) {
         batch.insert('rs_daily_log', row);
       }
