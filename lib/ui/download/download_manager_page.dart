@@ -322,6 +322,7 @@ class _BookDownloadTileState extends State<_BookDownloadTile> {
   }
 
   Future<void> _downloadChapter(int chapter) async {
+    final l10n = AppLocalizations.of(context)!;
     final recId = AudioLogic.getRecordingId(
       widget.bookId,
       chapter,
@@ -349,9 +350,9 @@ class _BookDownloadTileState extends State<_BookDownloadTile> {
       _reload();
     } catch (e) {
       if (mounted && e is! DownloadCanceledException) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Error: $e")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.errorMessage(e.toString()))),
+        );
       }
     }
   }
@@ -485,9 +486,9 @@ class _BookDownloadTileState extends State<_BookDownloadTile> {
       );
     } catch (e) {
       if (mounted && e is! DownloadCanceledException) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Error: $e")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.errorMessage(e.toString()))),
+        );
       }
     } finally {
       _reload();

@@ -262,9 +262,10 @@ class HomeManager {
     } catch (e) {
       if (!context.mounted) return;
       if (e is! DownloadCanceledException) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Download error: $e")));
+        final l10n = AppLocalizations.of(context)!;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.downloadError(e.toString()))),
+        );
       }
     }
   }

@@ -24,7 +24,6 @@ class UserSettings {
   static const _useSystemKeyboardKey = 'useSystemKeyboard';
   static const _currentBible = 'currentBible';
   static const _verseLayout = "verseLayout";
-  static const _rsDailyGoalKey = 'rsDailyGoal';
   static const _hasSeenReadingCheckboxGuideKey = '_hasSeenReadingCheckboxGuide';
   static const _hasSeenReadingSessionGuideKey = '_hasSeenReadingSessionGuide';
 
@@ -146,15 +145,6 @@ class UserSettings {
     } else {
       await _prefs.setString((_currentBible), bibleCode);
     }
-  }
-
-  /// Set the daily goal for the reading session
-  Future<void> setDailyGoal(String value) async {
-    await _prefs.setString(_rsDailyGoalKey, value);
-  }
-
-  String? get dailyGoal {
-    return _prefs.getString(_rsDailyGoalKey);
   }
 
   bool get hasSeenReadingCheckboxGuide {

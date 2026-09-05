@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:gbt/l10n/book_names.dart';
 import 'package:gbt/ui/home/panel_area/bible_panel/bible_panel.dart';
+import 'package:gbt/ui/home/panel_area/common/book_completed_overlay.dart';
 import 'package:gbt/ui/home/panel_area/common/goal_reached_overlay.dart';
 import 'package:gbt/ui/home/panel_area/common/reading_session_overlay.dart';
 import 'package:gbt/ui/home/panel_area/hebrew_greek_panel/chapter.dart';
@@ -43,8 +44,7 @@ class BiblePanelArea extends StatelessWidget {
           final settingsVersion = manager.settingsVersionNotifier.value;
           final shouldOffsetForProgress =
               manager.readingSessionManager.readingModeNotifier.value &&
-              manager.readingSessionManager.displayGoalProgresNotifier.value &&
-              manager.readingSessionManager.getDailyGoal() != null;
+              manager.readingSessionManager.displayGoalProgresNotifier.value;
 
           final shouldShowReadingCheckboxGuide =
               manager.appGuideManager.shouldShowReadingCheckboxGuide;
@@ -109,10 +109,23 @@ class BiblePanelArea extends StatelessWidget {
               ),
 
               GoalReachedOverlay(manager: manager.readingSessionManager),
+
+              BookCompletedOverlay(
+                manager: manager.readingSessionManager,
+                onNextBook: (bookId) => onNextBook(context, bookId),
+              ),
             ],
           );
         },
       ),
     );
+  }
+
+  void onNextBook(BuildContext context, int bookId) {
+    manager.onBookSelected(context, bookId);
+
+    manager.onChapterSelected(1);
+
+    manager.syncController.jumpToVerse(bookId, 1, 1);
   }
 }
