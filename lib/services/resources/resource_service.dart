@@ -156,8 +156,8 @@ class ResourceService {
     ResourceType resourceType,
     String id,
   ) async {
-    final localVersion = await _resourceDatabase.getResourceVersion(resourceType, id);
-    if (localVersion == null) {
+    final installed = await _resourceDatabase.isInstalled(resourceType, id);
+    if (!installed) {
         throw ResourceMissingException(resourceType, id);
     }
 

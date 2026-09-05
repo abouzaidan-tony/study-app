@@ -198,11 +198,27 @@ class ResourceDatabase {
       'resource',
       where: 'resource_type = ? AND id = ?',
       whereArgs: [resourceType.name, id],
-      columns: ['local_updated_at'],
+      columns: ['server_updated_at'],
       limit: 1,
     );
     if (rows.isEmpty) return null;
-    return rows.first['local_updated_at'] as String?;
+    return rows.first['server_updated_at'] as String?;
+  }
+
+  Future<bool> isInstalled(
+    ResourceType resourceType,
+    String id,
+  ) async {
+    final db = await _database;
+    final rows = await db.query(
+      'resource',
+      where: 'resource_type = ? AND id = ?',
+      whereArgs: [resourceType.name, id],
+      columns: ['install_state'],
+      limit: 1,
+    );
+    if (rows.isEmpty) return false;
+    return rows.first['install_state'] == InstallState.installed.name;
   }
 
   Future<void> setInstallState(
