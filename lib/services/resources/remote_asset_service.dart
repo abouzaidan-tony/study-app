@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:gbt/l10n/app_languages.dart';
 import 'package:gbt/services/files/file_service.dart'; // Import your FileType enum
 
 class RemoteAsset {
@@ -38,33 +37,9 @@ class RemoteAssetService {
   static final String _baseHost =
       kReleaseMode ? _prodBaseHost : _devBaseHost;
 
-  // --- BIBLE ASSETS ---
-
-  /// Returns the asset config for a specific language bible database.
-  /// Example: remote: .../bibles/spa_blm.db.zip -> local: spa_blm.db
-  RemoteAsset getBibleAsset(String langCode) {
-    final filename = AppLanguages.getConfig(langCode).bibleFilename;
-
-    return RemoteAsset(
-      remoteUrl: '$_baseHost/bibles/v1/$filename.zip',
-      localRelativePath: filename,
-      fileType: FileType.bible,
-      isZip: true,
-    );
-  }
-
-  // --- GLOSS ASSETS ---
-
-  RemoteAsset getGlossAsset(String langCode) {
-    final filename = '$langCode.db';
-
-    return RemoteAsset(
-      remoteUrl: '$_baseHost/glosses/v1/$filename.zip',
-      localRelativePath: filename,
-      fileType: FileType.gloss,
-      isZip: true,
-    );
-  }
+  /// Public accessor for the resolved asset base URL, used when constructing
+  /// manifest URLs (e.g. by [ResourceService.refreshResources]).
+  String get baseHost => _baseHost;
 
   // --- AUDIO ASSETS ---
 

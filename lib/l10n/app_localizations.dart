@@ -170,6 +170,12 @@ abstract class AppLocalizations {
   /// **'Gloss Language'**
   String get glossLanguage;
 
+  /// Settings menu item to change the Bible translation
+  ///
+  /// In en, this message translates to:
+  /// **'Bible Translation'**
+  String get bibleTranslation;
+
   /// Displayed in settings when no gloss language is selected
   ///
   /// In en, this message translates to:
@@ -386,6 +392,18 @@ abstract class AppLocalizations {
   /// **'Audio is not available for this chapter.'**
   String get audioNotAvailable;
 
+  /// Message shown in the audio player when audio for a specific chapter is missing.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio not available for {book} {chapter}'**
+  String audioNotAvailableForChapter(String book, int chapter);
+
+  /// Message shown in the audio player when an unspecified audio error occurs.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown audio error'**
+  String get unknownAudioError;
+
   /// Snackbar message when a verse is copied
   ///
   /// In en, this message translates to:
@@ -529,6 +547,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Lexicons'**
   String get lexicons;
+
+  /// Section header for Gloss downloads
+  ///
+  /// In en, this message translates to:
+  /// **'Glosses'**
+  String get glosses;
 
   /// Label for Old Testament audio selection
   ///

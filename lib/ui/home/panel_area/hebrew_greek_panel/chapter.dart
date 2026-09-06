@@ -2,9 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gbt/common/book_name.dart';
+import 'package:gbt/common/reference.dart';
 import 'package:gbt/common/word.dart';
 import 'package:gbt/l10n/app_localizations.dart';
 import 'package:gbt/services/reading_session/rs_manager.dart';
+import 'package:gbt/services/resources/resource.dart';
 import 'package:gbt/ui/common/resource_ui_helper.dart';
 import 'package:gbt/services/settings/user_settings.dart';
 import 'package:gbt/ui/home/panel_area/common/infinite_scroll_view.dart';
@@ -34,6 +36,7 @@ class HebrewGreekChapter extends StatefulWidget {
     required this.fontSize,
     required this.verseLayout,
     required this.readingModeEnabled,
+    required this.highlightNotifier,
     this.syncController,
     this.onReadingCheckboxGuideRectChanged,
     this.onReadingCheckboxGuideCompleted,
@@ -47,6 +50,7 @@ class HebrewGreekChapter extends StatefulWidget {
   final ScrollSyncController? syncController;
   final ValueChanged<Rect?>? onReadingCheckboxGuideRectChanged;
   final VoidCallback? onReadingCheckboxGuideCompleted;
+  final ValueNotifier<Reference?> highlightNotifier;
 
   @override
   State<HebrewGreekChapter> createState() => HebrewGreekChapterState();
@@ -164,16 +168,14 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
           builder: (context, words, child) {
             if (words.isEmpty) return const SizedBox();
 
-            return ValueListenableBuilder<VerseHighlight?>(
-              valueListenable:
-                  widget.syncController?.highlightNotifier ??
-                  ValueNotifier(null),
-              builder: (context, highlightInfo, _) {
+            return ValueListenableBuilder<Reference?>(
+              valueListenable: widget.highlightNotifier,
+              builder: (context, reference, _) {
                 int? verseToHighlight;
-                if (highlightInfo != null &&
-                    highlightInfo.bookId == widget.bookId &&
-                    highlightInfo.chapter == widget.chapter) {
-                  verseToHighlight = highlightInfo.verse;
+                if (reference != null &&
+                    reference.bookId == widget.bookId &&
+                    reference.chapter == widget.chapter) {
+                  verseToHighlight = reference.verse;
                 }
 
                 //always show first verse only (basic logic)
@@ -330,7 +332,7 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
 
   Future<void> _handleMissingGloss(String langCode) async {
     // Use the shared helper logic
-    final success = await ResourceUIHelper.ensureGloss(context, langCode);
+    final success = await ResourceUIHelper.ensureResource(context, ResourceType.gloss, langCode);
 
     if (!success && mounted) {
       // If they clicked "Cancel" or download failed,
@@ -343,7 +345,7 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
     }
   }
 
-  Future<void> _showWordDetails(int wordId) async {
+  Future<void> _showWordDetails(String wordId) async {
     await showDialog(
       context: context,
       builder: (context) => WordDetailsDialog(

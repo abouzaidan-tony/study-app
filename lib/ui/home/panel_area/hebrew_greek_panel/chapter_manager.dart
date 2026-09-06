@@ -5,6 +5,7 @@ import 'package:gbt/services/hebrew_greek/database.dart';
 import 'package:gbt/services/reading_session/rs_manager.dart';
 import 'package:gbt/services/service_locator.dart';
 import 'package:gbt/services/settings/user_settings.dart';
+import 'package:gbt/ui/home/panel_area/hebrew_greek_panel/text.dart';
 
 class HebrewGreekChapterManager {
   final _hebrewGreekDb = getIt<HebrewGreekDatabase>();
@@ -83,14 +84,16 @@ class HebrewGreekChapterManager {
     return bookId <= malachi;
   }
 
-  Future<String?> getPopupTextForId(
-    int wordId,
+  Future<WordPopup?> getPopupTextForId(
+    String wordId,
     void Function(String)? onGlossDownloadNeeded,
   ) async {
-    return _glossService.glossForId(
+    final gloss = await _glossService.glossForId(
       wordId: wordId,
       onDatabaseMissing: onGlossDownloadNeeded,
     );
+    if (gloss == null || gloss.gloss.isEmpty) return null;
+    return WordPopup(text: gloss.gloss, isAiGenerated: gloss.isAiGenerated);
   }
 
   Future<void> unsetGlossLang() async {
@@ -100,9 +103,7 @@ class HebrewGreekChapterManager {
   String getVerseText(int verse) {
     if (_disposed) return '';
     final words = textNotifier.value;
-    final verseWords = words
-        .where((w) => (w.id ~/ 100) % 1000 == verse)
-        .toList();
+    final verseWords = words.where((w) => w.reference.verse == verse).toList();
 
     if (verseWords.isEmpty) return '';
 

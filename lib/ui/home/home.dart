@@ -3,10 +3,10 @@ import 'package:gbt/common/reference.dart';
 import 'package:gbt/l10n/app_localizations.dart';
 import 'package:gbt/ui/home/appbar/reference_chooser/reference_chooser.dart';
 import 'package:gbt/ui/home/appbar/drawer.dart';
+import 'package:gbt/ui/home/audio/audio_player.dart';
 import 'package:gbt/ui/home/common/cutout_view.dart';
 import 'package:gbt/ui/home/common/guide_bubble.dart';
 import 'package:gbt/ui/home/panel_area/panel_area.dart';
-import 'package:gbt/ui/home/audio/audio_layer.dart';
 import 'package:gbt/ui/home/keypad/keypad_layer.dart';
 import 'package:gbt/ui/home/reading_plan/reading_sheet.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -88,7 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 },
                 onInputModeChanged: manager.setInputMode,
-                onTogglePanel: manager.togglePanelState,
+                onTogglePanel: () => manager.togglePanelState(context),
                 onPlayAudio: () => manager.toggleAudio(context),
                 onAvailableDigitsChanged: manager.setEnabledDigits,
                 onToggleReadingSession: () => toggleReadingSession(context),
@@ -115,7 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
           behavior: HitTestBehavior.translucent,
           child: BiblePanelArea(manager: manager),
         ),
-        AudioLayer(manager: manager),
+        BottomAudioPlayer(viewModel: manager.audioPlayerViewModel),
         KeypadLayer(manager: manager),
       ],
     );

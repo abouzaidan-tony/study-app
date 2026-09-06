@@ -1,176 +1,337 @@
 import 'package:audio_video_progress_bar/audio_video_progress_bar.dart';
 import 'package:flutter/material.dart';
-import 'package:just_audio/just_audio.dart';
+import 'package:gbt/common/reference.dart';
+import 'package:gbt/l10n/book_names.dart';
+import 'package:gbt/services/audio/audio_service.dart';
+import 'package:gbt/services/resources/resource.dart';
+import 'package:gbt/ui/home/audio/audio_player_view_model.dart';
 import 'package:gbt/l10n/app_localizations.dart';
-import 'package:gbt/services/audio/position_data.dart';
-import 'package:gbt/ui/home/audio/audio_logic.dart';
-
-import 'audio_manager.dart';
 
 class BottomAudioPlayer extends StatelessWidget {
-  final AudioManager audioManager;
-  final int currentBookId;
-  final int currentChapter;
-  final int currentVerse;
-  final String currentBookName;
-  final VoidCallback? onAudioMissing;
+  final AudioPlayerViewModel viewModel;
 
-  const BottomAudioPlayer({
-    super.key,
-    required this.audioManager,
-    required this.currentBookId,
-    required this.currentChapter,
-    required this.currentVerse,
-    required this.currentBookName,
-    this.onAudioMissing,
-  });
+  const BottomAudioPlayer({super.key, required this.viewModel});
+
+  @override
+  Widget build(BuildContext context) {
+    viewModel.setLocalizations(AppLocalizations.of(context)!);
+
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return ListenableBuilder(
+      listenable: viewModel,
+      builder: (buildContext, _) => _PlayerLauncher(
+        isVisible: viewModel.isVisible,
+        child: Container(
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHigh,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _ReferenceOrErrorRow(
+                      error: viewModel.error,
+                      reference: viewModel.reference.value,
+                    ),
+                    Row(
+                      spacing: 8,
+                      children: [
+                        _VoiceMenuButton(
+                          testament: viewModel.testament,
+                          activeSource: viewModel.testament != null
+                              ? viewModel.audioSource.forTestament(viewModel.testament!)
+                              : null,
+                          speakers: viewModel.speakers,
+                          onChange: viewModel.changeSource,
+                        ),
+                        Expanded(
+                          child: _ProgressBar(
+                            playback: viewModel.playback,
+                            onSeek: viewModel.error == null
+                                ? viewModel.seek
+                                : null,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          visualDensity: VisualDensity.compact,
+                          onPressed: viewModel.close,
+                        ),
+                      ],
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _RepeatMenuButton(
+                          repeatMode: viewModel.repeatMode,
+                          onChange: viewModel.changeRepeatMode,
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          spacing: 12,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.chevron_left_rounded),
+                              iconSize: 28,
+                              color: colorScheme.primary,
+                              onPressed: viewModel.error == null
+                                  ? viewModel.jumpToPrev
+                                  : null,
+                            ),
+                            _PlayButton(
+                              playbackState: viewModel.playbackState,
+                              onPlay: viewModel.error == null
+                                  ? viewModel.play
+                                  : null,
+                              onPause: viewModel.error == null
+                                  ? viewModel.pause
+                                  : null,
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.chevron_right_rounded),
+                              iconSize: 28,
+                              color: colorScheme.primary,
+                              onPressed: viewModel.error == null
+                                  ? viewModel.jumpToNext
+                                  : null,
+                            ),
+                          ],
+                        ),
+                        _SpeedMenuButton(
+                          speed: viewModel.speed,
+                          onChange: viewModel.setSpeed,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+    );
+  }
+}
+
+class _PlayerLauncher extends StatelessWidget {
+    final Widget child;
+    final bool isVisible;
+
+    const _PlayerLauncher({
+        required this.child,
+        required this.isVisible,
+    });
+
+    @override
+    Widget build(BuildContext context) {
+        return AnimatedSlide(
+            offset: isVisible ? Offset.zero : Offset(0, 1),
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: isVisible ? child : SizedBox.shrink(),
+            )
+        );
+    }
+}
+
+// --- SUB-WIDGETS ---
+
+class _ReferenceOrErrorRow extends StatelessWidget {
+  final AudioPlaybackError? error;
+  final Reference? reference;
+
+  const _ReferenceOrErrorRow({required this.error, required this.reference});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final hasTiming = AudioLogic.hasTimingData(currentBookId);
+    final l10n = AppLocalizations.of(context)!;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHigh,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
+    if (error == null) {
+      final refText = reference == null
+          ? ''
+          : '${bookNameFromId(context, reference!.bookId)} ${reference!.chapter}:${reference!.verse}';
+      return Text(
+        refText,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: theme.colorScheme.onSurface,
+        ),
+        textAlign: TextAlign.center,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+
+    final String text;
+    switch (error!) {
+      case AudioFileMissingError():
+        final bookName = bookNameFromId(context, error!.reference?.bookId ?? 0);
+        final chapter = error!.reference?.chapter ?? 0;
+        text = l10n.audioNotAvailableForChapter(bookName, chapter);
+      case AudioUnknownError():
+        text = l10n.unknownAudioError;
+    }
+    final color = theme.colorScheme.error;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.error_outline_rounded, size: 16, color: color),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            text,
+            style: theme.textTheme.bodyMedium?.copyWith(color: color),
+            textAlign: TextAlign.start,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-        ],
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // --- ROW 1: Voice Settings | Progress | Close ---
-              Row(
-                children: [
-                  // Voice Source Button (Person Head)
-                  _VoiceMenuButton(
-                    audioManager: audioManager,
-                    onAudioMissing: onAudioMissing,
-                    currentBookId: currentBookId,
-                    currentChapter: currentChapter,
-                  ),
-                  const SizedBox(width: 8),
+        ),
+      ],
+    );
+  }
+}
 
-                  // Progress Bar
-                  Expanded(
-                    child: StreamBuilder<PositionData>(
-                      stream: audioManager.audioHandler.positionDataStream,
-                      builder: (context, snapshot) {
-                        final positionData = snapshot.data;
-                        return ProgressBar(
-                          progress: positionData?.position ?? Duration.zero,
-                          buffered:
-                              positionData?.bufferedPosition ?? Duration.zero,
-                          total: positionData?.duration ?? Duration.zero,
-                          onSeek: audioManager.seek,
-                          barHeight: 4.0,
-                          thumbRadius: 6.0,
-                          thumbGlowRadius: 12.0,
-                          baseBarColor: colorScheme.outlineVariant,
-                          progressBarColor: colorScheme.primary,
-                          bufferedBarColor: colorScheme.primary.withValues(
-                            alpha: 0.3,
-                          ),
-                          thumbColor: colorScheme.primary,
-                          timeLabelLocation: TimeLabelLocation.sides,
-                          timeLabelTextStyle: theme.textTheme.labelSmall,
-                          timeLabelPadding: 8.0,
-                        );
-                      },
-                    ),
-                  ),
+class _VoiceMenuButton extends StatelessWidget {
+  final Testament? testament;
+  final String? activeSource;
+  final List<Resource> speakers;
+  final void Function(String)? onChange;
 
-                  const SizedBox(width: 8),
+  const _VoiceMenuButton({
+    required this.testament,
+    required this.activeSource,
+    required this.speakers,
+    required this.onChange,
+  });
 
-                  // Close Button
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    visualDensity: VisualDensity.compact,
-                    onPressed: audioManager.stopAndClose,
-                  ),
-                ],
-              ),
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      icon: const Icon(Icons.person_outline),
+      enabled: testament != null && speakers.isNotEmpty,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      onSelected: onChange,
+      itemBuilder: (BuildContext context) {
+        return speakers.map((speaker) {
+          final key = speaker.id.substring(speaker.id.indexOf('/') + 1);
+          return CheckedPopupMenuItem<String>(
+            value: key,
+            checked: activeSource == key,
+            child: Text(speaker.resourceName),
+          );
+        }).toList();
+      },
+    );
+  }
+}
 
-              const SizedBox(height: 4),
+class _RepeatMenuButton extends StatelessWidget {
+  final AudioRepeatMode repeatMode;
+  final Function(AudioRepeatModeType) onChange;
 
-              // --- ROW 2: Repeat | Controls | Speed ---
-              Row(
-                children: [
-                  // Far Left: Repeat Mode
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: hasTiming
-                          ? _RepeatMenuButton(audioManager: audioManager)
-                          : const SizedBox(),
-                    ),
-                  ),
+  const _RepeatMenuButton({required this.repeatMode, required this.onChange});
 
-                  // Center: Playback Controls
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Previous Verse
-                      IconButton(
-                        icon: const Icon(Icons.chevron_left_rounded),
-                        iconSize: 28,
-                        color: hasTiming
-                            ? colorScheme.primary
-                            : colorScheme.onSurface.withValues(alpha: 0.3),
-                        onPressed: hasTiming
-                            ? audioManager.skipToPreviousVerse
-                            : null,
-                      ),
+  @override
+  Widget build(BuildContext context) {
+    IconData iconData;
+    Color iconColor;
+    final theme = Theme.of(context);
 
-                      const SizedBox(width: 12),
+    // Determine Icon and Color
+    switch (repeatMode.type) {
+      case AudioRepeatModeType.none:
+        iconData = Icons.repeat;
+        // Primary color with alpha to indicate "Off" / Disabled state
+        iconColor = theme.colorScheme.primary.withValues(alpha: 0.3);
+      case AudioRepeatModeType.verse:
+        iconData = Icons.repeat_one_rounded;
+        iconColor = theme.colorScheme.primary;
+      case AudioRepeatModeType.chapter:
+        iconData = Icons.repeat_rounded;
+        iconColor = theme.colorScheme.primary;
+    }
 
-                      // Play/Pause
-                      _PlayButton(
-                        audioManager: audioManager,
-                        bookId: currentBookId,
-                        chapter: currentChapter,
-                        verse: currentVerse,
-                        bookName: currentBookName,
-                        onAudioMissing: onAudioMissing,
-                      ),
+    return PopupMenuButton<AudioRepeatModeType>(
+      icon: Icon(iconData, color: iconColor),
+      offset: const Offset(0, -120),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      onSelected: onChange,
+      itemBuilder: (BuildContext context) {
+        final l10n = AppLocalizations.of(context)!;
+        return [
+          CheckedPopupMenuItem<AudioRepeatModeType>(
+            value: AudioRepeatModeType.none,
+            checked: repeatMode.type == AudioRepeatModeType.none,
+            child: Text(l10n.repeatNone), // "Off"
+          ),
+          CheckedPopupMenuItem<AudioRepeatModeType>(
+            value: AudioRepeatModeType.verse,
+            checked: repeatMode.type == AudioRepeatModeType.verse,
+            child: Text(l10n.repeatVerse), // "Repeat Verse"
+          ),
+          CheckedPopupMenuItem<AudioRepeatModeType>(
+            value: AudioRepeatModeType.chapter,
+            checked: repeatMode.type == AudioRepeatModeType.chapter,
+            child: Text(l10n.repeatChapter), // "Repeat Chapter"
+          ),
+        ];
+      },
+    );
+  }
+}
 
-                      const SizedBox(width: 12),
+class _SpeedMenuButton extends StatelessWidget {
+  final double speed;
+  final Function(double) onChange;
 
-                      // Next Verse
-                      IconButton(
-                        icon: const Icon(Icons.chevron_right_rounded),
-                        iconSize: 28,
-                        color: hasTiming
-                            ? colorScheme.primary
-                            : colorScheme.onSurface.withValues(alpha: 0.3),
-                        onPressed: hasTiming
-                            ? audioManager.skipToNextVerse
-                            : null,
-                      ),
-                    ],
-                  ),
+  const _SpeedMenuButton({required this.speed, required this.onChange});
 
-                  // Far Right: Playback Speed
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: _SpeedMenuButton(audioManager: audioManager),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    // Displays "1.0x", "0.75x", "1.5x" etc.
+    String label = "${speed}x";
+
+    return PopupMenuButton<double>(
+      offset: const Offset(0, -220),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      onSelected: onChange,
+      itemBuilder: (BuildContext context) {
+        const speeds = [0.5, 0.75, 0.85, 1.0, 1.2, 1.5];
+        return speeds.map((speedOption) {
+          return CheckedPopupMenuItem<double>(
+            value: speedOption,
+            checked: speed == speedOption,
+            child: Text("${speedOption}x"),
+          );
+        }).toList();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: colorScheme.primary,
           ),
         ),
       ),
@@ -178,216 +339,16 @@ class BottomAudioPlayer extends StatelessWidget {
   }
 }
 
-// --- SUB-WIDGETS ---
-
-class _VoiceMenuButton extends StatelessWidget {
-  final AudioManager audioManager;
-  final VoidCallback? onAudioMissing;
-  final int currentBookId;
-  final int currentChapter;
-
-  const _VoiceMenuButton({
-    required this.audioManager,
-    required this.currentBookId,
-    required this.currentChapter,
-    this.onAudioMissing,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<AudioSourceType>(
-      valueListenable: audioManager.audioSourceNotifier,
-      builder: (context, currentSourcePref, _) {
-        final activeRecordingId = AudioLogic.getRecordingId(
-          currentBookId,
-          currentChapter,
-          currentSourcePref,
-        );
-        final isNt = AudioLogic.isNewTestament(currentBookId);
-
-        return PopupMenuButton<AudioSourceType>(
-          icon: const Icon(Icons.person_outline),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          onSelected: (AudioSourceType source) async {
-            try {
-              await audioManager.setAudioSource(source);
-            } on AudioMissingException {
-              onAudioMissing?.call();
-            }
-          },
-          itemBuilder: (BuildContext context) {
-            final l10n = AppLocalizations.of(context)!;
-
-            if (isNt) {
-              final jhAvailable = AudioLogic.isJhAvailableForBook(
-                currentBookId,
-              );
-              return [
-                CheckedPopupMenuItem<AudioSourceType>(
-                  value: AudioSourceType.tk,
-                  checked: activeRecordingId == 'TK',
-                  child: Text(l10n.sourceTK),
-                ),
-                if (jhAvailable)
-                  CheckedPopupMenuItem<AudioSourceType>(
-                    value: AudioSourceType.jh,
-                    checked: activeRecordingId == 'JH',
-                    child: Text(l10n.sourceJH),
-                  ),
-              ];
-            } else {
-              // Menu option shows RDB as long as chapter is available
-              final rdbAvailable = AudioLogic.isRdbAvailable(
-                currentBookId,
-                currentChapter,
-              );
-              return [
-                CheckedPopupMenuItem<AudioSourceType>(
-                  value: AudioSourceType.heb,
-                  checked: activeRecordingId == 'HEB',
-                  child: Text(l10n.sourceHEB),
-                ),
-                if (rdbAvailable)
-                  CheckedPopupMenuItem<AudioSourceType>(
-                    value: AudioSourceType.rdb,
-                    checked: activeRecordingId == 'RDB',
-                    child: Text(l10n.sourceRDB),
-                  ),
-              ];
-            }
-          },
-        );
-      },
-    );
-  }
-}
-
-class _RepeatMenuButton extends StatelessWidget {
-  final AudioManager audioManager;
-
-  const _RepeatMenuButton({required this.audioManager});
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<AudioRepeatMode>(
-      valueListenable: audioManager.repeatModeNotifier,
-      builder: (context, currentMode, _) {
-        IconData iconData;
-        Color iconColor;
-        final theme = Theme.of(context);
-
-        // Determine Icon and Color
-        switch (currentMode) {
-          case AudioRepeatMode.none:
-            iconData = Icons.repeat;
-            // Primary color with alpha to indicate "Off" / Disabled state
-            iconColor = theme.colorScheme.primary.withValues(alpha: 0.3);
-          case AudioRepeatMode.verse:
-            iconData = Icons.repeat_one_rounded;
-            iconColor = theme.colorScheme.primary;
-          case AudioRepeatMode.chapter:
-            iconData = Icons.repeat_rounded;
-            iconColor = theme.colorScheme.primary;
-        }
-
-        return PopupMenuButton<AudioRepeatMode>(
-          icon: Icon(iconData, color: iconColor),
-          offset: const Offset(0, -120),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          onSelected: audioManager.setRepeatMode,
-          itemBuilder: (BuildContext context) {
-            final l10n = AppLocalizations.of(context)!;
-            return [
-              CheckedPopupMenuItem<AudioRepeatMode>(
-                value: AudioRepeatMode.none,
-                checked: currentMode == AudioRepeatMode.none,
-                child: Text(l10n.repeatNone), // "Off"
-              ),
-              CheckedPopupMenuItem<AudioRepeatMode>(
-                value: AudioRepeatMode.verse,
-                checked: currentMode == AudioRepeatMode.verse,
-                child: Text(l10n.repeatVerse), // "Repeat Verse"
-              ),
-              CheckedPopupMenuItem<AudioRepeatMode>(
-                value: AudioRepeatMode.chapter,
-                checked: currentMode == AudioRepeatMode.chapter,
-                child: Text(l10n.repeatChapter), // "Repeat Chapter"
-              ),
-            ];
-          },
-        );
-      },
-    );
-  }
-}
-
-class _SpeedMenuButton extends StatelessWidget {
-  final AudioManager audioManager;
-
-  const _SpeedMenuButton({required this.audioManager});
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<double>(
-      valueListenable: audioManager.playbackSpeedNotifier,
-      builder: (context, currentSpeed, _) {
-        final colorScheme = Theme.of(context).colorScheme;
-
-        // Displays "1.0x", "0.75x", "1.5x" etc.
-        String label = "${currentSpeed}x";
-
-        return PopupMenuButton<double>(
-          offset: const Offset(0, -220),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          onSelected: audioManager.setPlaybackSpeed,
-          itemBuilder: (BuildContext context) {
-            const speeds = [0.5, 0.75, 0.85, 1.0, 1.2, 1.5];
-            return speeds.map((speed) {
-              return CheckedPopupMenuItem<double>(
-                value: speed,
-                checked: currentSpeed == speed,
-                child: Text("${speed}x"),
-              );
-            }).toList();
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: colorScheme.primary,
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
 class _PlayButton extends StatelessWidget {
   const _PlayButton({
-    required this.audioManager,
-    required this.bookId,
-    required this.chapter,
-    required this.verse,
-    required this.bookName,
-    this.onAudioMissing,
+    required this.playbackState,
+    required this.onPlay,
+    required this.onPause,
   });
 
-  final AudioManager audioManager;
-  final int bookId;
-  final int chapter;
-  final int verse;
-  final String bookName;
-  final VoidCallback? onAudioMissing;
+  final AudioPlaybackState playbackState;
+  final VoidCallback? onPlay;
+  final VoidCallback? onPause;
 
   static const _size = 48.0;
 
@@ -395,65 +356,68 @@ class _PlayButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).colorScheme.primary;
 
-    return StreamBuilder<PlayerState>(
-      stream: audioManager.audioHandler.playerStateStream,
+    switch (playbackState) {
+      case AudioPlaybackState.loading:
+        return SizedBox(
+          width: _size,
+          height: _size,
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: CircularProgressIndicator(strokeWidth: 3),
+          ),
+        );
+      case AudioPlaybackState.paused:
+        return IconButton(
+          icon: const Icon(Icons.play_circle_fill_rounded),
+          iconSize: _size,
+          color: primaryColor,
+          padding: EdgeInsets.zero,
+          onPressed: onPlay,
+        );
+      case AudioPlaybackState.playing:
+        return IconButton(
+          icon: const Icon(Icons.pause_circle_filled_rounded),
+          iconSize: _size,
+          color: primaryColor,
+          padding: EdgeInsets.zero,
+          onPressed: onPause,
+        );
+    }
+  }
+}
+
+class _ProgressBar extends StatelessWidget {
+  final Stream<({Duration? duration, Duration buffered, Duration position})>
+  playback;
+  final Function(Duration)? onSeek;
+
+  const _ProgressBar({required this.playback, required this.onSeek});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return StreamBuilder(
+      stream: playback,
       builder: (context, snapshot) {
-        final playerState = snapshot.data;
-        final processingState = playerState?.processingState;
-        final playing = playerState?.playing;
-
-        if (processingState == ProcessingState.loading ||
-            processingState == ProcessingState.buffering) {
-          return SizedBox(
-            width: _size,
-            height: _size,
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: CircularProgressIndicator(strokeWidth: 3),
-            ),
-          );
-        } else if (playing != true) {
-          return IconButton(
-            icon: const Icon(Icons.play_circle_fill_rounded),
-            iconSize: _size,
-            color: primaryColor,
-            padding: EdgeInsets.zero,
-            onPressed: () async {
-              // Check availability before attempting play
-              if (!AudioLogic.isAudioAvailable(bookId, chapter)) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      AppLocalizations.of(context)!.audioNotAvailable,
-                    ),
-                  ),
-                );
-                return;
-              }
-
-              try {
-                await audioManager.play(
-                  checkBookId: bookId,
-                  checkChapter: chapter,
-                  checkBookName: bookName,
-                  startVerse: verse,
-                );
-              } on AudioMissingException catch (_) {
-                onAudioMissing?.call();
-              } catch (e) {
-                debugPrint("Play error: $e");
-              }
-            },
-          );
-        } else {
-          return IconButton(
-            icon: const Icon(Icons.pause_circle_filled_rounded),
-            iconSize: _size,
-            color: primaryColor,
-            padding: EdgeInsets.zero,
-            onPressed: audioManager.pause,
-          );
-        }
+        final playback = snapshot.data;
+        return ProgressBar(
+          progress: playback?.position ?? Duration.zero,
+          buffered: playback?.buffered ?? Duration.zero,
+          total: playback?.duration ?? Duration.zero,
+          onSeek: onSeek,
+          barHeight: 4.0,
+          thumbRadius: 6.0,
+          thumbGlowRadius: 12.0,
+          baseBarColor: colorScheme.outlineVariant,
+          progressBarColor: colorScheme.primary,
+          bufferedBarColor: colorScheme.primary.withValues(alpha: 0.3),
+          thumbColor: colorScheme.primary,
+          timeLabelLocation: TimeLabelLocation.sides,
+          timeLabelTextStyle: theme.textTheme.labelSmall,
+          timeLabelPadding: 8.0,
+        );
       },
     );
   }

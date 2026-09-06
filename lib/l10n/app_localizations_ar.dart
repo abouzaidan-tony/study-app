@@ -42,6 +42,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get glossLanguage => 'لغة التفسير';
 
   @override
+  String get bibleTranslation => 'ترجمة الكتاب المقدس';
+
+  @override
   String get glossNone => 'لا شيء';
 
   @override
@@ -165,6 +168,14 @@ class AppLocalizationsAr extends AppLocalizations {
   String get audioNotAvailable => 'الصوت غير متوفر لهذا الإصحاح.';
 
   @override
+  String audioNotAvailableForChapter(String book, int chapter) {
+    return 'الصوت غير متوفر لسفر $book الإصحاح $chapter';
+  }
+
+  @override
+  String get unknownAudioError => 'خطأ غير معروف في الصوت';
+
+  @override
   String get verseCopied => 'تم نسخ الآية إلى الحافظة';
 
   @override
@@ -251,6 +262,9 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get lexicons => 'المعاجم';
+
+  @override
+  String get glosses => 'التفاسير';
 
   @override
   String get oldTestament => 'العهد القديم';

@@ -14,7 +14,7 @@ class WordDetailsDialogManager extends ChangeNotifier {
   WordDetails? wordDetails;
   List<LexiconMeaning> lexiconMeanings = [];
 
-  Future<void> init(int wordId) async {
+  Future<void> init(String wordId) async {
     wordDetails = await _getWordDetails(wordId);
     lexiconMeanings = await _lexiconDb.getMeaningsForStrongs(
       wordDetails!.strongsCode,
@@ -22,14 +22,15 @@ class WordDetailsDialogManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<WordDetails> _getWordDetails(int wordId) async {
+  Future<WordDetails> _getWordDetails(String wordId) async {
     final word = await _hebrewGreekDb.getWordForId(wordId);
     final gloss = await _glossService.glossForId(wordId: wordId);
     final (strongs, grammar) =
         await _hebrewGreekDb.getStrongsAndGrammar(wordId) ?? ('', '');
     return WordDetails(
-      word: word ?? '',
-      gloss: gloss ?? '',
+      word: word?.text ?? '',
+      gloss: gloss?.gloss ?? '',
+      glossIsAi: gloss?.isAiGenerated ?? false,
       strongsCode: strongs,
       grammar: grammar,
     );
@@ -77,12 +78,16 @@ class WordDetails {
   const WordDetails({
     required this.word,
     required this.gloss,
+    required this.glossIsAi,
     required this.strongsCode,
     required this.grammar,
   });
 
   final String word;
   final String gloss;
+
+  final bool glossIsAi;
+
   final String strongsCode;
   final String grammar;
 

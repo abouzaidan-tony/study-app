@@ -42,6 +42,9 @@ class AppLocalizationsFr extends AppLocalizations {
   String get glossLanguage => 'Langue du glossaire';
 
   @override
+  String get bibleTranslation => 'Traduction de la Bible';
+
+  @override
   String get glossNone => 'Aucune';
 
   @override
@@ -166,6 +169,14 @@ class AppLocalizationsFr extends AppLocalizations {
       'L’audio n’est pas disponible pour ce chapitre.';
 
   @override
+  String audioNotAvailableForChapter(String book, int chapter) {
+    return 'Audio non disponible pour $book $chapter';
+  }
+
+  @override
+  String get unknownAudioError => 'Erreur audio inconnue';
+
+  @override
   String get verseCopied => 'Verset copié dans le presse-papiers';
 
   @override
@@ -253,6 +264,9 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get lexicons => 'Lexiques';
+
+  @override
+  String get glosses => 'Glosses';
 
   @override
   String get oldTestament => 'Ancien Testament';

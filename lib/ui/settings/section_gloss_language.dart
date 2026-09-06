@@ -18,16 +18,20 @@ class _GlossLanguageSectionState extends State<GlossLanguageSection> {
   final _settings = getIt<UserSettings>();
   final _resourceService = getIt<ResourceService>();
 
-  List<Resource> glossResources = [];
+  List<GlossLanguageOption> glossResources = [];
 
+  @override
   void initState() {
+    super.initState();
     _initGlossResources();
   }
 
   Future<void> _initGlossResources() async {
     try {
-      glossResources = await _resourceService.getResourcesByType(ResourceType.Gloss);
-      setState(() {});
+      final resources = await _resourceService.getResourcesByType(ResourceType.gloss);
+      setState(() {
+          glossResources = resources.map((resource) => GlossLanguageOption(resource.id, resource.resourceName)).toList();
+      });
     } catch (err, stack) {
       log('Failed to initialize gloss resources', error: err, stackTrace: stack);
     }
@@ -35,7 +39,7 @@ class _GlossLanguageSectionState extends State<GlossLanguageSection> {
 
 
   /// Sentinel representing "no gloss language" in the picker.
-  static final _noneGloss = Resource(name: '', id: '');
+  static final _noneGloss = GlossLanguageOption('', '');
 
   String? get currentGlossLangCode => _settings.glossLang;
 
@@ -60,7 +64,7 @@ class _GlossLanguageSectionState extends State<GlossLanguageSection> {
     final textStyle = Theme.of(context).textTheme.bodyLarge;
     final previousCode = currentGlossLangCode;
 
-    final selected = await showDialog<Resource>(
+    final selected = await showDialog<GlossLanguageOption>(
       context: context,
       builder: (BuildContext context) {
         return SimpleDialog(
@@ -90,14 +94,15 @@ class _GlossLanguageSectionState extends State<GlossLanguageSection> {
 
     await setGlossLang(selected.id);
 
-    if (!context.mounted) return;
-    final success = await ResourceUIHelper.ensureGloss(
+    if (!mounted) return;
+    final success = await ResourceUIHelper.ensureResource(
       context,
+      ResourceType.gloss,
       selected.id,
     );
 
     // Revert if they cancelled or it failed
-    if (!success && context.mounted) {
+    if (!success && mounted) {
       await setGlossLang(previousCode);
     }
   }
@@ -117,4 +122,11 @@ class _GlossLanguageSectionState extends State<GlossLanguageSection> {
       },
     );
   }
+}
+
+class GlossLanguageOption {
+    String id;
+    String name;
+
+    GlossLanguageOption(this.id, this.name);
 }

@@ -67,8 +67,9 @@ class GlossDatabase {
       print('Finding unique words in $fileName');
       final words = _extractWords(jsonData);
       for (final word in words) {
-        if (word.gloss == null) continue;
-        uniqueText.add(word.gloss!);
+        final text = word.gloss ?? word.aiGloss;
+        if (text == null) continue;
+        uniqueText.add(text);
       }
     }
     return _createTable(uniqueText, _insertText);
@@ -110,8 +111,14 @@ class GlossDatabase {
   void _addGlossWords(List<Gloss> words, Map<String, int> textMap) {
     _database.execute('BEGIN TRANSACTION;');
     for (var word in words) {
-      final textForeignId = textMap[word.gloss];
-      _insertVerseGloss.execute([word.id, textForeignId]);
+      final text = word.gloss ?? word.aiGloss;
+      final textForeignId = textMap[text];
+      final isAi = word.gloss == null && word.aiGloss != null;
+      _insertVerseGloss.execute([
+        word.sourceId,
+        textForeignId,
+        isAi ? 1 : 0,
+      ]);
     }
     _database.execute('COMMIT;');
   }
@@ -124,17 +131,23 @@ class GlossDatabase {
 }
 
 class Gloss {
-  final int id;
+  /// The source word id as a string (BBCCCVVVWW, e.g. "0100100101").
+  final String sourceId;
   final String? gloss;
 
-  Gloss({required this.id, required this.gloss});
+  final String? aiGloss;
+
+  Gloss({required this.sourceId, required this.gloss, this.aiGloss});
 
   factory Gloss.fromJson(Map<String, dynamic> json) {
-    final id = int.parse(json['id']);
-    var gloss = json['gloss']?.trim();
-    return Gloss(id: id, gloss: gloss);
+    final sourceId = json['id'].toString();
+    return Gloss(
+      sourceId: sourceId,
+      gloss: json['gloss']?.trim(),
+      aiGloss: json['aiGloss']?.trim(),
+    );
   }
 
   @override
-  String toString() => 'Word(id: $id, gloss: $gloss)';
+  String toString() => 'Word(sourceId: $sourceId, gloss: $gloss, aiGloss: $aiGloss)';
 }
