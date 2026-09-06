@@ -25,7 +25,7 @@ class ReadingSessionManager {
 
   static int maximumReadCount = 10;
 
-  ReadingSessionManager() {}
+  ReadingSessionManager();
 
   final List<VoidCallback> _booksProgressListeners = [];
   final List<VoidCallback> _statsListeners = [];

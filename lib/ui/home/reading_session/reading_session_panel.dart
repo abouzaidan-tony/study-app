@@ -830,8 +830,8 @@ class ReadingSessionPanelState extends State<ReadingSessionPanel> {
   }
 
   Widget _dailyGoalText() {
-    final l10n = AppLocalizations.of(context)!;
-    final color = Theme.of(context).colorScheme.primary;
+    // final l10n = AppLocalizations.of(context)!;
+    // final color = Theme.of(context).colorScheme.primary;
 
     return Center(
       // child: Text(
@@ -908,7 +908,7 @@ class ReadingSessionPanelState extends State<ReadingSessionPanel> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
       ),
       onPressed: () async {
-        final result = await showModalBottomSheet<(GoalType, int)>(
+        await showModalBottomSheet<(GoalType, int)>(
           context: context,
           isScrollControlled: true,
           isDismissible: true,
