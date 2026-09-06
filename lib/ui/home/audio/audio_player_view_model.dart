@@ -287,6 +287,7 @@ class AudioPlayerViewModel extends ChangeNotifier {
   }
 
   Future<void> _playerStateStreamHandler(PlayerState state) async {
+    if (state.processingState == ProcessingState.idle) return;
     if (state.processingState != ProcessingState.completed) {
       if (state.processingState != ProcessingState.ready) {
         setPlaybackState(AudioPlaybackState.loading);
@@ -336,7 +337,7 @@ class AudioPlayerViewModel extends ChangeNotifier {
 
   Future<void> _errorStreamHandler(Object error) async {
     debugPrint("Audio player error: $error");
-    await _reset(error: AudioUnknownError(reference.value));
+    await _reset(reference: reference.value, error: AudioUnknownError(reference.value));
   }
 
   Future<void> _positionStreamHandler(Duration? position) async {
@@ -369,9 +370,9 @@ class AudioPlayerViewModel extends ChangeNotifier {
     await _seekToReference(targetReference);
   }
 
-  Future<void> _reset({ AudioPlaybackError? error }) async {
+  Future<void> _reset({ Reference? reference, AudioPlaybackError? error }) async {
     await player.clearAudioSources();
-    setReference(null);
+    setReference(reference);
     setError(error);
     setPlaybackState(AudioPlaybackState.paused);
     _timings = [];
@@ -404,7 +405,7 @@ class AudioPlayerViewModel extends ChangeNotifier {
     if (nextTestament != prevTestament) {
       speakers = await _audioService.getSpeakers(nextTestament);
       if (speakers.isEmpty) {
-        await _reset(error: AudioFileMissingError(newReference));
+        await _reset(reference: newReference, error: AudioFileMissingError(newReference));
         return;
       }
 
@@ -440,7 +441,7 @@ class AudioPlayerViewModel extends ChangeNotifier {
         newReference.chapter,
       );
     } on AudioMissingException {
-      await _reset(error: AudioFileMissingError(newReference));
+      await _reset(reference: newReference, error: AudioFileMissingError(newReference));
       return;
     }
 
@@ -462,7 +463,7 @@ class AudioPlayerViewModel extends ChangeNotifier {
         );
     } catch (error) {
         debugPrint("Failed to load audio: $error");
-        await _reset(error: AudioUnknownError(newReference));
+        await _reset(reference: newReference, error: AudioUnknownError(newReference));
     }
 
     _seekToReference(newReference);
