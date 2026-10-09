@@ -138,13 +138,16 @@ class ResourceDatabase {
   }
 
   Future<List<Resource>> getAllForType(
-    ResourceType resourceType,
-  ) async {
+    ResourceType resourceType, {
+    bool includeRemoved = true,
+  }) async {
     final db = await _database;
     final rows = await db.query(
       'resource',
-      where: 'resource_type = ?',
-      whereArgs: [resourceType.name],
+      where: includeRemoved
+          ? 'resource_type = ?'
+          : '''resource_type = ? AND (server_state IS NULL OR server_state != 'removed')''',
+      whereArgs: [resourceType.name]
     );
 
     return rows.map(_rowToResource).toList();

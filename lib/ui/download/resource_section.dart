@@ -53,8 +53,10 @@ class _ResourceSectionState extends State<ResourceSection> {
   }
 
   Future<void> _loadResources() async {
-    final resources =
-        await _resourceService.getResourcesByType(widget.resourceType);
+    final resources = await _resourceService.getResourcesByType(
+      widget.resourceType,
+      includeRemoved: false,
+    );
     if (!mounted) return;
     setState(() {
         _resources = ResourceTreeNode.buildTree(resources);

@@ -130,8 +130,14 @@ class ResourceService {
     _recomputeOutdatedCounts();
   }
 
-  Future<List<Resource>> getResourcesByType(ResourceType resourceType) async {
-      return _resourceDatabase.getAllForType(resourceType);
+  Future<List<Resource>> getResourcesByType(
+    ResourceType resourceType, {
+    bool includeRemoved = true,
+  }) async {
+      return _resourceDatabase.getAllForType(
+        resourceType,
+        includeRemoved: includeRemoved,
+      );
   }
 
   Future<List<Resource>> getResourcesByPath(
