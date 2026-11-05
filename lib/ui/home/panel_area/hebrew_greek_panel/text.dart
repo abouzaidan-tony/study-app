@@ -278,6 +278,11 @@ class HebrewGreekText extends LeafRenderObjectWidget {
       popupTextStyle,
     );
 
+    final popupHighlightTextStyle = TextStyle(
+      fontSize: 20,
+      color: Theme.of(context).colorScheme.onInverseSurface,
+    );
+
     return RenderHebrewGreekText(
       words: words,
       controller: controller,
@@ -287,6 +292,7 @@ class HebrewGreekText extends LeafRenderObjectWidget {
       popupWordProvider: popupWordProvider,
       popupBackgroundColor: popupBackgroundColor ?? Color(0xFF000000),
       popupTextStyle: effectivePopupTextStyle,
+      popupHighlightTextStyle: popupHighlightTextStyle,
       onPopupShown: onPopupShown,
       onWordLongPress: onWordLongPress,
       onVerseNumberTap: onVerseNumberTap,
@@ -342,6 +348,11 @@ class HebrewGreekText extends LeafRenderObjectWidget {
       color: Color(0xFFFFFFFF),
     ).merge(popupTextStyle);
 
+    final popupHighlightTextStyle = TextStyle(
+      fontSize: 20,
+      color: Theme.of(context).colorScheme.onInverseSurface,
+    );
+
     renderObject
       ..words = words
       ..controller = controller
@@ -351,6 +362,7 @@ class HebrewGreekText extends LeafRenderObjectWidget {
       ..popupWordProvider = popupWordProvider
       ..popupBackgroundColor = popupBackgroundColor ?? Color(0xFF000000)
       ..popupTextStyle = effectivePopupTextStyle
+      ..popupHighlightTextStyle = popupHighlightTextStyle
       ..onPopupShown = onPopupShown
       ..onWordLongPress = onWordLongPress
       ..onVerseNumberTap = onVerseNumberTap
@@ -449,6 +461,7 @@ class RenderHebrewGreekText extends RenderBox {
     AsyncPopupWordProvider? popupWordProvider,
     required Color popupBackgroundColor,
     required TextStyle popupTextStyle,
+    required TextStyle popupHighlightTextStyle,
     ValueChanged<Rect>? onPopupShown,
     AsyncWordActionCallback? onWordLongPress,
     ValueChanged<int>? onVerseNumberTap,
@@ -485,6 +498,7 @@ class RenderHebrewGreekText extends RenderBox {
        _popupWordProvider = popupWordProvider,
        _popupBackgroundColor = popupBackgroundColor,
        _popupTextStyle = popupTextStyle,
+       _popupHighlightTextStyle = popupHighlightTextStyle,
        _onPopupShown = onPopupShown,
        _onWordLongPress = onWordLongPress,
        _onVerseNumberTap = onVerseNumberTap,
@@ -873,6 +887,17 @@ class RenderHebrewGreekText extends RenderBox {
   set popupTextStyle(TextStyle value) {
     if (_popupTextStyle == value) return;
     _popupTextStyle = value;
+    if (_tappedWordId != null) {
+      _preparePopupPainter();
+      markNeedsPaint();
+    }
+  }
+
+  TextStyle _popupHighlightTextStyle;
+  TextStyle get popupHighlightTextStyle => _popupHighlightTextStyle;
+  set popupHighlightTextStyle(TextStyle value) {
+    if (_popupHighlightTextStyle == value) return;
+    _popupHighlightTextStyle = value;
     if (_tappedWordId != null) {
       _preparePopupPainter();
       markNeedsPaint();
@@ -2049,7 +2074,7 @@ class RenderHebrewGreekText extends RenderBox {
 
       if (anchorRect != null) {
         final painter = TextPainter(
-          text: TextSpan(text: "Clear", style: _popupTextStyle),
+          text: TextSpan(text: "Clear", style: _popupHighlightTextStyle),
           textDirection: TextDirection.ltr,
         )..layout();
 
@@ -2058,7 +2083,7 @@ class RenderHebrewGreekText extends RenderBox {
         );
 
         final painter2 = TextPainter(
-          text: TextSpan(text: "Copy", style: _popupTextStyle),
+          text: TextSpan(text: "Copy", style: _popupHighlightTextStyle),
           textDirection: TextDirection.ltr,
         )..layout();
 
