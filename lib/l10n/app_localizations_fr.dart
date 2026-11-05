@@ -627,4 +627,10 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get bookRevelation => 'Apocalypse';
+
+  @override
+  String get highlightSelectionClear => 'Effacer';
+
+  @override
+  String get highlightSelectionCopy => 'Copier';
 }

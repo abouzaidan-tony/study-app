@@ -801,5 +801,13 @@
   "bookRevelation": "Revelation",
   "@bookRevelation": {
     "description": "The name of the sixty-sixth book of the Bible"
+  },
+  "highlightSelectionClear": "Clear",
+  "@highlightSelectionClear": {
+    "description": "Button to clear the current text highlight"
+  },
+  "highlightSelectionCopy": "Copy",
+  "@highlightSelectionCopy": {
+    "description": "Button to copy the selected text"
   }
 }

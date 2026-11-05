@@ -628,4 +628,10 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get bookRevelation => 'Apocalipsis';
+
+  @override
+  String get highlightSelectionClear => 'Borrar';
+
+  @override
+  String get highlightSelectionCopy => 'Copiar';
 }

@@ -181,5 +181,7 @@
     "book2John": "2 Juan",
     "book3John": "3 Juan",
     "bookJude": "Judas",
-    "bookRevelation": "Apocalipsis"
+    "bookRevelation": "Apocalipsis",
+    "highlightSelectionClear": "Borrar",
+    "highlightSelectionCopy": "Copiar"
 }

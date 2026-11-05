@@ -181,5 +181,7 @@
     "book2John": "يوحنا الثانية",
     "book3John": "يوحنا الثالثة",
     "bookJude": "يهوذا",
-    "bookRevelation": "رؤيا يوحنا"
+    "bookRevelation": "رؤيا يوحنا",
+    "highlightSelectionClear": "مسح",
+    "highlightSelectionCopy": "نسخ"
 }

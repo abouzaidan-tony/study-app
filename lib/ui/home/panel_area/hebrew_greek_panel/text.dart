@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:studyapp/l10n/app_localizations.dart';
 import 'package:studyapp/common/word.dart';
 import 'package:studyapp/services/bookmarks/bookmark_model.dart';
 import 'package:studyapp/services/settings/user_settings.dart';
@@ -293,6 +294,12 @@ class HebrewGreekText extends LeafRenderObjectWidget {
       popupBackgroundColor: popupBackgroundColor ?? Color(0xFF000000),
       popupTextStyle: effectivePopupTextStyle,
       popupHighlightTextStyle: popupHighlightTextStyle,
+      highlightSelectionClearLabel: AppLocalizations.of(
+        context,
+      )!.highlightSelectionClear,
+      highlightSelectionCopyLabel: AppLocalizations.of(
+        context,
+      )!.highlightSelectionCopy,
       onPopupShown: onPopupShown,
       onWordLongPress: onWordLongPress,
       onVerseNumberTap: onVerseNumberTap,
@@ -363,6 +370,12 @@ class HebrewGreekText extends LeafRenderObjectWidget {
       ..popupBackgroundColor = popupBackgroundColor ?? Color(0xFF000000)
       ..popupTextStyle = effectivePopupTextStyle
       ..popupHighlightTextStyle = popupHighlightTextStyle
+      ..highlightSelectionClearLabel = AppLocalizations.of(
+        context,
+      )!.highlightSelectionClear
+      ..highlightSelectionCopyLabel = AppLocalizations.of(
+        context,
+      )!.highlightSelectionCopy
       ..onPopupShown = onPopupShown
       ..onWordLongPress = onWordLongPress
       ..onVerseNumberTap = onVerseNumberTap
@@ -462,6 +475,8 @@ class RenderHebrewGreekText extends RenderBox {
     required Color popupBackgroundColor,
     required TextStyle popupTextStyle,
     required TextStyle popupHighlightTextStyle,
+    required String highlightSelectionClearLabel,
+    required String highlightSelectionCopyLabel,
     ValueChanged<Rect>? onPopupShown,
     AsyncWordActionCallback? onWordLongPress,
     ValueChanged<int>? onVerseNumberTap,
@@ -499,6 +514,8 @@ class RenderHebrewGreekText extends RenderBox {
        _popupBackgroundColor = popupBackgroundColor,
        _popupTextStyle = popupTextStyle,
        _popupHighlightTextStyle = popupHighlightTextStyle,
+       _highlightSelectionClearLabel = highlightSelectionClearLabel,
+       _highlightSelectionCopyLabel = highlightSelectionCopyLabel,
        _onPopupShown = onPopupShown,
        _onWordLongPress = onWordLongPress,
        _onVerseNumberTap = onVerseNumberTap,
@@ -902,6 +919,16 @@ class RenderHebrewGreekText extends RenderBox {
       _preparePopupPainter();
       markNeedsPaint();
     }
+  }
+
+  String _highlightSelectionClearLabel;
+  set highlightSelectionClearLabel(String value) {
+    _highlightSelectionClearLabel = value;
+  }
+
+  String _highlightSelectionCopyLabel;
+  set highlightSelectionCopyLabel(String value) {
+    _highlightSelectionCopyLabel = value;
   }
 
   void _preparePopupPainter() {
@@ -2074,7 +2101,10 @@ class RenderHebrewGreekText extends RenderBox {
 
       if (anchorRect != null) {
         final painter = TextPainter(
-          text: TextSpan(text: "Clear", style: _popupHighlightTextStyle),
+          text: TextSpan(
+            text: _highlightSelectionClearLabel,
+            style: _popupHighlightTextStyle,
+          ),
           textDirection: TextDirection.ltr,
         )..layout();
 
@@ -2083,7 +2113,10 @@ class RenderHebrewGreekText extends RenderBox {
         );
 
         final painter2 = TextPainter(
-          text: TextSpan(text: "Copy", style: _popupHighlightTextStyle),
+          text: TextSpan(
+            text: _highlightSelectionCopyLabel,
+            style: _popupHighlightTextStyle,
+          ),
           textDirection: TextDirection.ltr,
         )..layout();
 

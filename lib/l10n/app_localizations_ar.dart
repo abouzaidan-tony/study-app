@@ -625,4 +625,10 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get bookRevelation => 'رؤيا يوحنا';
+
+  @override
+  String get highlightSelectionClear => 'مسح';
+
+  @override
+  String get highlightSelectionCopy => 'نسخ';
 }

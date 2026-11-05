@@ -1195,6 +1195,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Revelation'**
   String get bookRevelation;
+
+  /// Button to clear the current text highlight
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get highlightSelectionClear;
+
+  /// Button to copy the selected text
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get highlightSelectionCopy;
 }
 
 class _AppLocalizationsDelegate

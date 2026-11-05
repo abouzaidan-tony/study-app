@@ -626,4 +626,10 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get bookRevelation => 'Apocalipse';
+
+  @override
+  String get highlightSelectionClear => 'Limpar';
+
+  @override
+  String get highlightSelectionCopy => 'Copiar';
 }

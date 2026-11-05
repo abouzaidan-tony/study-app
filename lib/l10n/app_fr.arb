@@ -181,5 +181,7 @@
     "book2John": "2 Jean",
     "book3John": "3 Jean",
     "bookJude": "Jude",
-    "bookRevelation": "Apocalypse"
+    "bookRevelation": "Apocalypse",
+    "highlightSelectionClear": "Effacer",
+    "highlightSelectionCopy": "Copier"
 }
