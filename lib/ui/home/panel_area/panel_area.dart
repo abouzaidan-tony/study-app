@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:studyapp/l10n/book_names.dart';
-import 'package:studyapp/ui/home/panel_area/bible_panel/bible_panel.dart';
-import 'package:studyapp/ui/home/panel_area/common/goal_reached_overlay.dart';
-import 'package:studyapp/ui/home/panel_area/common/reading_session_overlay.dart';
-import 'package:studyapp/ui/home/panel_area/hebrew_greek_panel/chapter.dart';
-import 'package:studyapp/ui/home/panel_area/hebrew_greek_panel/panel.dart';
-import 'package:studyapp/ui/home/home_manager.dart';
+import 'package:gbt/common/reference.dart';
+import 'package:gbt/ui/home/panel_area/bible_panel/bible_panel.dart';
+import 'package:gbt/ui/home/panel_area/common/book_completed_overlay.dart';
+import 'package:gbt/ui/home/panel_area/common/goal_reached_overlay.dart';
+import 'package:gbt/ui/home/panel_area/common/reading_session_overlay.dart';
+import 'package:gbt/ui/home/panel_area/hebrew_greek_panel/chapter.dart';
+import 'package:gbt/ui/home/panel_area/hebrew_greek_panel/panel.dart';
+import 'package:gbt/ui/home/home_manager.dart';
 
 class BiblePanelArea extends StatelessWidget {
   const BiblePanelArea({super.key, required this.manager});
@@ -16,14 +17,15 @@ class BiblePanelArea extends StatelessWidget {
   Widget build(BuildContext context) {
     return NotificationListener<VerseNumberTapNotification>(
       onNotification: (notification) {
-        final isShowingPlayer = manager.audioManager.isVisibleNotifier.value;
+        final isShowingPlayer = manager.audioPlayerViewModel.isVisible;
         if (isShowingPlayer) {
-          manager.audioManager.play(
-            checkBookId: notification.bookId,
-            checkChapter: notification.chapter,
-            checkBookName: bookNameFromId(context, notification.bookId),
-            startVerse: notification.verse,
-          );
+          manager.audioPlayerViewModel.jumpTo(
+            Reference(
+                bookId: notification.bookId,
+                chapter: notification.chapter,
+                verse: notification.verse
+            ),
+          ).then((_) => manager.audioPlayerViewModel.play());
         }
         return true;
       },
@@ -43,8 +45,7 @@ class BiblePanelArea extends StatelessWidget {
           final settingsVersion = manager.settingsVersionNotifier.value;
           final shouldOffsetForProgress =
               manager.readingSessionManager.readingModeNotifier.value &&
-              manager.readingSessionManager.displayGoalProgresNotifier.value &&
-              manager.readingSessionManager.getDailyGoal() != null;
+              manager.readingSessionManager.displayGoalProgresNotifier.value;
 
           final shouldShowReadingCheckboxGuide =
               manager.appGuideManager.shouldShowReadingCheckboxGuide;
@@ -65,6 +66,7 @@ class BiblePanelArea extends StatelessWidget {
                     key: ValueKey('hg-${anchor.bookId}-${anchor.chapter}'),
                     bookId: anchor.bookId,
                     chapter: anchor.chapter,
+                    highlightNotifier: manager.audioPlayerViewModel.reference,
                     syncController: manager.syncController,
                     settingsVersion: settingsVersion,
                     scrollingEnabled: !disableScrolling,
@@ -89,6 +91,7 @@ class BiblePanelArea extends StatelessWidget {
                       syncController: manager.syncController,
                       settingsVersion: settingsVersion,
                       scrollingEnabled: !disableScrolling,
+                      onResourceUnavailable: manager.closeBiblePanel,
                     ),
                   ),
                 ],
@@ -109,10 +112,23 @@ class BiblePanelArea extends StatelessWidget {
               ),
 
               GoalReachedOverlay(manager: manager.readingSessionManager),
+
+              BookCompletedOverlay(
+                manager: manager.readingSessionManager,
+                onNextBook: (bookId) => onNextBook(context, bookId),
+              ),
             ],
           );
         },
       ),
     );
+  }
+
+  void onNextBook(BuildContext context, int bookId) {
+    manager.onBookSelected(context, bookId);
+
+    manager.onChapterSelected(1);
+
+    manager.syncController.jumpToVerse(bookId, 1, 1);
   }
 }

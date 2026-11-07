@@ -1,5 +1,5 @@
-import 'package:studyapp/services/bookmarks/bookmark_model.dart';
-import 'package:studyapp/services/common/abstract_database.dart';
+import 'package:gbt/services/bookmarks/bookmark_model.dart';
+import 'package:gbt/services/common/abstract_database.dart';
 
 class BookmarksDatabase extends AbstractDatabase {
   static const _databaseName = 'bookmarks';

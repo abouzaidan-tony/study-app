@@ -39,6 +39,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get language => 'Language';
 
   @override
+  String get glossLanguage => 'Gloss Language';
+
+  @override
+  String get bibleTranslation => 'Bible Translation';
+
+  @override
+  String get glossNone => 'None';
+
+  @override
   String get currentLanguage => 'English';
 
   @override
@@ -159,10 +168,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get audioNotAvailable => 'Audio is not available for this chapter.';
 
   @override
+  String audioNotAvailableForChapter(String book, int chapter) {
+    return 'Audio not available for $book $chapter';
+  }
+
+  @override
+  String get unknownAudioError => 'Unknown audio error';
+
+  @override
   String get verseCopied => 'Verse copied to clipboard';
 
   @override
   String get downloads => 'Downloads';
+
+  @override
+  String get allLanguages => 'All languages';
 
   @override
   String get backupRestore => 'Backup/restore';
@@ -238,6 +258,25 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get exportLogs => 'Export Logs';
+
+  @override
+  String get exportLogsDescription =>
+      'Save the last 30 days of logs in a zip file so you can email it.';
+
+  @override
+  String get chooseLogLocation => 'Choose log file location';
+
+  @override
+  String get logsExported => 'Logs exported';
+
+  @override
+  String get noLogsToExport => 'No log files exist for the last 30 days.';
+
+  @override
+  String get logExportFailed => 'Could not export logs.';
+
+  @override
   String get audio => 'Audio';
 
   @override
@@ -245,6 +284,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get lexicons => 'Lexicons';
+
+  @override
+  String get glosses => 'Glosses';
 
   @override
   String get oldTestament => 'Old Testament';
@@ -427,6 +469,158 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get no => 'No';
+
+  @override
+  String get errorLoadingContent => 'Error loading content.';
+
+  @override
+  String errorLoadingVerse(String error) {
+    return 'Error loading verse: $error';
+  }
+
+  @override
+  String errorMessage(String error) {
+    return 'Error: $error';
+  }
+
+  @override
+  String downloadError(String error) {
+    return 'Download error: $error';
+  }
+
+  @override
+  String get readingPlans => 'Reading Plans';
+
+  @override
+  String get yourReadingPlans => 'Your Reading Plans';
+
+  @override
+  String get edit => 'Edit';
+
+  @override
+  String get createNewPlan => 'Create New Plan';
+
+  @override
+  String get current => 'Current';
+
+  @override
+  String get startReading => 'Start Reading';
+
+  @override
+  String get resumeReading => 'Resume Reading';
+
+  @override
+  String booksReadOfTotal(int read, int total) {
+    return '$read of $total books';
+  }
+
+  @override
+  String get todaysGoal => 'Today\'s Goal';
+
+  @override
+  String get completedToday => 'Completed today';
+
+  @override
+  String get estimatedCompletion => 'Estimated Completion';
+
+  @override
+  String get planComplete => 'Plan complete!';
+
+  @override
+  String daysCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count days',
+      one: '1 day',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String monthsCount(String count) {
+    return '($count months)';
+  }
+
+  @override
+  String get booksInThisPlan => 'Books in this Plan';
+
+  @override
+  String get done => 'Done';
+
+  @override
+  String get editOrder => 'Edit Order';
+
+  @override
+  String get defaultReadingPlanName => 'Plan 1';
+
+  @override
+  String get collection => 'Collection';
+
+  @override
+  String get goal => 'Goal';
+
+  @override
+  String get planName => 'Plan name';
+
+  @override
+  String get wholeBible => 'Whole Bible';
+
+  @override
+  String get torah => 'Torah';
+
+  @override
+  String get prophets => 'Prophets';
+
+  @override
+  String get writings => 'Writings';
+
+  @override
+  String get gospels => 'Gospels';
+
+  @override
+  String get paulineEpistles => 'Pauline Epistles';
+
+  @override
+  String allBooksSelected(int total) {
+    return 'All $total books selected';
+  }
+
+  @override
+  String booksSelected(int selected, int total) {
+    return '$selected/$total books selected';
+  }
+
+  @override
+  String get updateReadingPlan => 'Update Reading Plan';
+
+  @override
+  String get addReadingPlan => 'Add Reading Plan';
+
+  @override
+  String get deselectAll => 'Deselect All';
+
+  @override
+  String get selectAll => 'Select All';
+
+  @override
+  String get selectAtLeastOneBook => 'Select at least one book';
+
+  @override
+  String doneSelected(int count) {
+    return 'Done ($count selected)';
+  }
+
+  @override
+  String bookCompletedTitle(String book) {
+    return 'You\'ve completed $book!';
+  }
+
+  @override
+  String get completed => 'Completed';
+
+  @override
+  String get nextBookInPlan => 'Next Book in Plan';
 
   @override
   String get bookGenesis => 'Genesis';

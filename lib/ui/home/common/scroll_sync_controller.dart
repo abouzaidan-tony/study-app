@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:gbt/common/reference.dart';
 
 class VerseHighlight {
   final int bookId;
@@ -35,6 +36,8 @@ class ScrollSyncController extends ChangeNotifier {
   Object? _activeSource;
   final _verseJumpController = StreamController<VerseHighlight>.broadcast();
   Stream<VerseHighlight> get onVerseJump => _verseJumpController.stream;
+
+  ValueNotifier<Reference?>? _audioReferenceNotifier;
 
   void setActiveSource(Object source) {
     _activeSource = source;
@@ -88,41 +91,51 @@ class ScrollSyncController extends ChangeNotifier {
 
   bool isSourceActive(Object source) => _activeSource == source;
 
+  VerseHighlight? _pendingVerseJump;
+  VerseHighlight? get pendingVerseJump => _pendingVerseJump;
+
   void jumpToVerse(int bookId, int chapter, int verse, {bool isAuto = false}) {
-    _verseJumpController.add(
-      VerseHighlight(
-        bookId: bookId,
-        chapter: chapter,
-        verse: verse,
-        isAuto: isAuto,
-      ),
-    );
-  }
-
-  final highlightNotifier = ValueNotifier<VerseHighlight?>(null);
-
-  void setHighlight(int bookId, int chapter, int? verse) {
-    if (verse == null) {
-      if (highlightNotifier.value != null) {
-        highlightNotifier.value = null;
-      }
-      return;
-    }
-
-    final newState = VerseHighlight(
+    final target = VerseHighlight(
       bookId: bookId,
       chapter: chapter,
       verse: verse,
+      isAuto: isAuto,
     );
-    if (highlightNotifier.value != newState) {
-      highlightNotifier.value = newState;
-    }
+    _pendingVerseJump = target;
+    _verseJumpController.add(target);
+  }
+
+  void clearPendingJump() {
+    _pendingVerseJump = null;
+  }
+
+  void listenToAudioReference(ValueNotifier<Reference?> reference) {
+    if (identical(_audioReferenceNotifier, reference)) return;
+
+    _audioReferenceNotifier?.removeListener(_onAudioReferenceChanged);
+    _audioReferenceNotifier = reference;
+    _audioReferenceNotifier?.addListener(_onAudioReferenceChanged);
+  }
+
+  void _onAudioReferenceChanged() {
+    // Don't override the user scrolling
+    if (_activeSource != null) return;
+
+    final reference = _audioReferenceNotifier?.value;
+    if (reference == null) return;
+
+    jumpToVerse(
+      reference.bookId,
+      reference.chapter,
+      reference.verse,
+      isAuto: true,
+    );
   }
 
   @override
   void dispose() {
+    _audioReferenceNotifier?.removeListener(_onAudioReferenceChanged);
     _verseJumpController.close();
-    highlightNotifier.dispose();
     super.dispose();
   }
 }

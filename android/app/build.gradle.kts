@@ -3,7 +3,6 @@ import java.io.FileInputStream
 
 plugins {
     id("com.android.application")
-    id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -17,19 +16,19 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace = "com.globalbibletools.gbt"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = "27.0.12077973"
+    ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     defaultConfig {
-        applicationId = "com.globalbibletools.gbt"
+        // Optional suffix (e.g. "pr123") set via APPLICATION_ID_SUFFIX env var
+        // so test builds can be installed side by side with production.
+        val idSuffix = System.getenv("APPLICATION_ID_SUFFIX")?.takeIf { it.isNotBlank() }
+        applicationId = "com.globalbibletools.gbt" + (idSuffix?.let { ".$it" } ?: "")
+        manifestPlaceholders["appLabel"] = if (idSuffix != null) "GBT ($idSuffix)" else "GBT"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -57,6 +56,12 @@ android {
                 "proguard-rules.pro"
             )
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
 }
 

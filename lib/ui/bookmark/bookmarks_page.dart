@@ -1,11 +1,9 @@
-import 'dart:developer';
-
 import 'package:flutter/material.dart';
 import 'package:scripture/scripture.dart';
-import 'package:studyapp/common/book_name.dart';
-import 'package:studyapp/services/bookmarks/bookmark_model.dart';
-import 'package:studyapp/ui/bookmark/bookmarks_page_manager.dart';
-import 'package:studyapp/ui/home/home_manager.dart';
+import 'package:gbt/common/book_name.dart';
+import 'package:gbt/services/bookmarks/bookmark_model.dart';
+import 'package:gbt/ui/bookmark/bookmarks_page_manager.dart';
+import 'package:gbt/ui/home/home_manager.dart';
 
 class BookmarksManagerPage extends StatefulWidget {
   BookmarksManagerPage({super.key, required this.homeManager});

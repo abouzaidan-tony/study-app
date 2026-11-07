@@ -1,29 +1,43 @@
 import 'package:flutter/material.dart';
-import 'package:studyapp/l10n/app_localizations.dart';
-import 'package:studyapp/services/download/cancel_token.dart';
-import 'package:studyapp/services/resources/resource_service.dart';
-import 'package:studyapp/services/service_locator.dart';
-import 'package:studyapp/ui/common/download_progress_dialog.dart';
+import 'package:gbt/l10n/app_localizations.dart';
+import 'package:gbt/services/download/cancel_token.dart';
+import 'package:gbt/services/resources/resource_service.dart';
+import 'package:gbt/services/service_locator.dart';
+import 'package:gbt/ui/common/download_progress_dialog.dart';
 
 class ResourceUIHelper {
-  /// Unified method to prompt for download.
-  /// Returns true if resources are ready (already existed or downloaded).
-  static Future<bool> ensureResources(
+  static final Map<String, Future<bool>> _pendingRequests = {};
+
+  static Future<bool> ensureResource(
     BuildContext context,
-    Locale targetLocale,
+    ResourceType resourceType,
+    String id,
+  ) {
+    final key = '${resourceType.name}:$id';
+    final pending = _pendingRequests[key];
+    if (pending != null) return pending;
+
+    final future = _ensureResource(context, resourceType, id).whenComplete(() {
+      _pendingRequests.remove(key);
+    });
+    _pendingRequests[key] = future;
+    return future;
+  }
+
+  static Future<bool> _ensureResource(
+    BuildContext context,
+    ResourceType resourceType,
+    String id,
   ) async {
     final resourceService = getIt<ResourceService>();
-    final isDownloaded = await resourceService.areResourcesDownloaded(
-      targetLocale,
-    );
+    if (await resourceService.resourceExists(resourceType, id)) {
+      return true;
+    }
 
-    if (isDownloaded) return true;
-
-    // 1. Load the strings for the target locale so the dialog is in their language
-    final l10n = await AppLocalizations.delegate.load(targetLocale);
     if (!context.mounted) return false;
+    final l10n = AppLocalizations.of(context)!;
 
-    // 2. Show Prompt
+    // 1. Show Prompt
     final shouldDownload =
         await showDialog<bool>(
           context: context,
@@ -46,14 +60,15 @@ class ResourceUIHelper {
 
     if (!shouldDownload) return false;
 
-    // 3. Show Download Dialog
+    // 2. Show Download Dialog
     try {
       if (!context.mounted) throw Exception('Context not mounted');
       await DownloadProgressDialog.show(
         context: context,
-        task: (progress, token) => resourceService.downloadResources(
-          targetLocale,
-          progressNotifier: progress,
+        task: (progress, token) => resourceService.downloadResource(
+          resourceType,
+          id,
+          onProgress: (p) => progress.value = p,
           cancelToken: token,
         ),
       );

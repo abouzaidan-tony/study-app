@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:shared_preferences/shared_preferences.dart';
+import 'settings_migrations.dart';
 
 enum VerseLayout { paragraph, versePerLine }
 
@@ -9,6 +10,7 @@ class UserSettings {
 
   Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
+    await migrateSettings(_prefs);
   }
 
   static const _themeModeKey = 'themeMode';
@@ -19,13 +21,15 @@ class UserSettings {
   static const _bibleFontScaleKey = 'bibleFontScale';
   static const _wordDetailsFontScaleKey = 'wordDetailsFontScale';
   static const _localeKey = 'locale';
+  static const _glossLangKey = 'glossLang';
   static const _isHebrewSearchKey = 'isHebrewSearch';
   static const _useSystemKeyboardKey = 'useSystemKeyboard';
   static const _currentBible = 'currentBible';
+  static const _downloadLangKey = 'downloadLang';
   static const _verseLayout = "verseLayout";
-  static const _rsDailyGoalKey = 'rsDailyGoal';
   static const _hasSeenReadingCheckboxGuideKey = '_hasSeenReadingCheckboxGuide';
   static const _hasSeenReadingSessionGuideKey = '_hasSeenReadingSessionGuide';
+  static const _occurrenceParallelBiblesKey = 'occurrenceParallelBibles';
 
   String? get themeMode {
     return _prefs.getString(_themeModeKey);
@@ -92,6 +96,18 @@ class UserSettings {
     }
   }
 
+  String? get glossLang {
+    return _prefs.getString(_glossLangKey);
+  }
+
+  Future<void> setGlossLang(String? code) async {
+    if (code == null) {
+      await _prefs.remove(_glossLangKey);
+    } else {
+      await _prefs.setString(_glossLangKey, code);
+    }
+  }
+
   bool get isHebrewSearch {
     return _prefs.getBool(_isHebrewSearchKey) ?? true;
   }
@@ -112,33 +128,32 @@ class UserSettings {
     return _prefs.getString(_currentBible);
   }
 
+  Future<void> setCurrentBible(String? bibleCode) async {
+    if (bibleCode == null) {
+      await _prefs.remove(_currentBible);
+    } else {
+      await _prefs.setString(_currentBible, bibleCode);
+    }
+  }
+
+  String? get downloadLang {
+    return _prefs.getString(_downloadLangKey);
+  }
+
+  Future<void> setDownloadLang(String? code) async {
+    if (code == null) {
+      await _prefs.remove(_downloadLangKey);
+    } else {
+      await _prefs.setString(_downloadLangKey, code);
+    }
+  }
+
   VerseLayout get verseLayout {
     return VerseLayout.values[_prefs.getInt(_verseLayout) ?? 0];
   }
 
   Future<void> setVerseLayout(VerseLayout value) async {
     await _prefs.setInt(_verseLayout, value.index);
-  }
-
-  /// Set language and version of the currently selected Bible
-  ///
-  /// Example: eng_bsb (English - Berean Standard Bible)
-  /// null means the user has not downloaded a Bible or non is selected.
-  Future<void> setCurrentBible(String? bibleCode) async {
-    if (bibleCode == null) {
-      _prefs.remove(_currentBible);
-    } else {
-      await _prefs.setString((_currentBible), bibleCode);
-    }
-  }
-
-  /// Set the daily goal for the reading session
-  Future<void> setDailyGoal(String value) async {
-    await _prefs.setString(_rsDailyGoalKey, value);
-  }
-
-  String? get dailyGoal {
-    return _prefs.getString(_rsDailyGoalKey);
   }
 
   bool get hasSeenReadingCheckboxGuide {
@@ -155,5 +170,13 @@ class UserSettings {
 
   Future<void> setHasSeenReadingSessionGuide(bool value) async {
     await _prefs.setBool(_hasSeenReadingSessionGuideKey, value);
+  }
+
+  List<String> get occurrenceParallelBibles {
+    return _prefs.getStringList(_occurrenceParallelBiblesKey) ?? const [];
+  }
+
+  Future<void> setOccurrenceParallelBibles(List<String> bibles) async {
+    await _prefs.setStringList(_occurrenceParallelBiblesKey, bibles);
   }
 }

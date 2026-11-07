@@ -1,24 +1,26 @@
 import 'package:get_it/get_it.dart';
-import 'package:studyapp/app_state.dart';
-import 'package:studyapp/services/app_guide/app_guide_manager.dart';
-import 'package:studyapp/services/bookmarks/bookmark_database.dart';
-import 'package:studyapp/services/reading_session/rs_database.dart';
-import 'package:studyapp/services/reading_session/rs_manager.dart';
-import 'package:studyapp/services/resources/remote_asset_service.dart';
-import 'package:studyapp/services/audio/audio_database.dart';
-import 'package:studyapp/services/bible/bible_service.dart';
-import 'package:studyapp/services/download/download.dart';
-import 'package:studyapp/services/files/file_service.dart';
-import 'package:studyapp/services/gloss/gloss_service.dart';
-import 'package:studyapp/services/hebrew_greek/database.dart';
-import 'package:studyapp/services/lexicon/database.dart';
-import 'package:studyapp/services/resources/resource_service.dart';
+import 'package:gbt/app_state.dart';
+import 'package:gbt/services/app_guide/app_guide_manager.dart';
+import 'package:gbt/services/bookmarks/bookmark_database.dart';
+import 'package:gbt/services/reading_session/rs_database.dart';
+import 'package:gbt/services/reading_session/rs_manager.dart';
+import 'package:gbt/services/resources/remote_asset_service.dart';
+import 'package:gbt/services/bible/bible_service.dart';
+import 'package:gbt/services/download/download.dart';
+import 'package:gbt/services/files/file_service.dart';
+import 'package:gbt/services/gloss/gloss_service.dart';
+import 'package:gbt/services/hebrew_greek/database.dart';
+import 'package:gbt/services/lexicon/database.dart';
+import 'package:gbt/services/logging/app_logger.dart';
+import 'package:gbt/services/resources/resource_service.dart';
+import 'package:gbt/ui/home/home_manager.dart';
 
 import 'settings/user_settings.dart';
 
 final getIt = GetIt.instance;
 
 void setupServiceLocator() {
+  getIt.registerLazySingleton<HomeManager>(() => HomeManager());
   getIt.registerLazySingleton<FileService>(() => FileService());
   getIt.registerLazySingleton<RemoteAssetService>(() => RemoteAssetService());
   getIt.registerLazySingleton<HebrewGreekDatabase>(() => HebrewGreekDatabase());
@@ -26,9 +28,9 @@ void setupServiceLocator() {
   getIt.registerLazySingleton<LexiconsDatabase>(() => LexiconsDatabase());
   getIt.registerLazySingleton<UserSettings>(() => UserSettings());
   getIt.registerLazySingleton<AppState>(() => AppState());
+  getIt.registerSingletonAsync<AppLogger>(AppLogger.createDefault);
   getIt.registerLazySingleton<DownloadService>(() => DownloadService());
-  getIt.registerSingleton<BibleService>(BibleService());
-  getIt.registerLazySingleton<AudioDatabase>(() => AudioDatabase());
+  getIt.registerLazySingleton<BibleService>(() => BibleService());
   getIt.registerLazySingleton<ResourceService>(() => ResourceService());
   getIt.registerLazySingleton<ReadingSessionDatabase>(
     () => ReadingSessionDatabase(),

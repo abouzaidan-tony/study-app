@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:studyapp/common/reference.dart';
-import 'package:studyapp/l10n/app_localizations.dart';
-import 'package:studyapp/ui/home/appbar/reference_chooser/reference_chooser.dart';
-import 'package:studyapp/ui/home/appbar/drawer.dart';
-import 'package:studyapp/ui/home/common/cutout_view.dart';
-import 'package:studyapp/ui/home/common/guide_bubble.dart';
-import 'package:studyapp/ui/home/panel_area/panel_area.dart';
-import 'package:studyapp/ui/home/audio/audio_layer.dart';
-import 'package:studyapp/ui/home/keypad/keypad_layer.dart';
-import 'package:studyapp/ui/home/reading_session/reading_session_panel.dart';
+import 'package:gbt/common/reference.dart';
+import 'package:gbt/l10n/app_localizations.dart';
+import 'package:gbt/ui/home/appbar/reference_chooser/reference_chooser.dart';
+import 'package:gbt/ui/home/appbar/drawer.dart';
+import 'package:gbt/ui/home/audio/audio_player.dart';
+import 'package:gbt/ui/home/common/cutout_view.dart';
+import 'package:gbt/ui/home/common/guide_bubble.dart';
+import 'package:gbt/ui/home/panel_area/panel_area.dart';
+import 'package:gbt/ui/home/keypad/keypad_layer.dart';
+import 'package:gbt/ui/home/reading_plan/reading_sheet.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'appbar/appbar.dart';
+import 'package:gbt/services/service_locator.dart';
+import 'floating_return_pill.dart';
 import 'home_manager.dart';
+import 'word_study_overlay_layer.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,12 +25,13 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final manager = HomeManager();
+  late final HomeManager manager;
   final _guideOverlayKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
+    manager = getIt<HomeManager>();
     WakelockPlus.enable();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       manager.checkOnboarding(context);
@@ -49,19 +53,65 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      key: _guideOverlayKey,
-      children: [
-        Scaffold(
-          appBar: _buildAppBar(),
-          drawer: AppDrawer(
-            onSettingsClosed: manager.notifySettingsChanged,
-            homeManager: manager,
+    return ListenableBuilder(
+      listenable: manager.searchContextNotifier,
+      builder: (context, _) {
+        final hasActiveSearch = manager.searchContextNotifier.value != null;
+        return PopScope(
+          canPop: !hasActiveSearch,
+          onPopInvokedWithResult: (didPop, result) {
+            if (didPop) return;
+            if (hasActiveSearch) {
+              manager.setWordStudyOverlayVisible(true);
+            }
+          },
+          child: Stack(
+            key: _guideOverlayKey,
+            children: [
+              Scaffold(
+                appBar: _buildAppBar(),
+                drawer: AppDrawer(
+                  onSettingsClosed: manager.notifySettingsChanged,
+                  homeManager: manager,
+                ),
+                body: _buildBody(),
+              ),
+              _buildGuideOverlay(),
+              _buildWordStudyOverlay(),
+            ],
           ),
-          body: _buildBody(),
-        ),
-        _buildGuideOverlay(),
-      ],
+        );
+      },
+    );
+  }
+
+  Widget _buildWordStudyOverlay() {
+    return ListenableBuilder(
+      listenable: manager.wordStudySessionNotifier,
+      builder: (context, _) {
+        final session = manager.wordStudySessionNotifier.value;
+        if (session == null) return const SizedBox.shrink();
+
+        return Positioned.fill(
+          child: ListenableBuilder(
+            listenable: session.isOverlayVisibleNotifier,
+            builder: (context, _) {
+              final isVisible = session.isOverlayVisible;
+              return Offstage(
+                key: const Key('word_study_offstage'),
+                offstage: !isVisible,
+                child: TickerMode(
+                  enabled: isVisible,
+                  child: WordStudyOverlayLayer(
+                    session: session,
+                    manager: manager,
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 
@@ -91,7 +141,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 },
                 onInputModeChanged: manager.setInputMode,
-                onTogglePanel: manager.togglePanelState,
+                onTogglePanel: () => manager.togglePanelState(context),
                 onPlayAudio: () => manager.toggleAudio(context),
                 onAvailableDigitsChanged: manager.setEnabledDigits,
                 onToggleReadingSession: () => toggleReadingSession(context),
@@ -118,7 +168,30 @@ class _HomeScreenState extends State<HomeScreen> {
           behavior: HitTestBehavior.translucent,
           child: BiblePanelArea(manager: manager),
         ),
-        AudioLayer(manager: manager),
+        ListenableBuilder(
+          listenable: Listenable.merge([
+            manager.searchContextNotifier,
+            manager.audioPlayerViewModel,
+          ]),
+          builder: (context, _) {
+            final searchContext = manager.searchContextNotifier.value;
+            if (searchContext == null) return const SizedBox.shrink();
+            final bottomPadding =
+                manager.audioPlayerViewModel.isVisible ? 180.0 : 16.0;
+            return Positioned(
+              bottom: bottomPadding,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                top: false,
+                child: Center(
+                  child: FloatingReturnPill(contextData: searchContext),
+                ),
+              ),
+            );
+          },
+        ),
+        BottomAudioPlayer(viewModel: manager.audioPlayerViewModel),
         KeypadLayer(manager: manager),
       ],
     );
@@ -218,7 +291,7 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (context) {
-        return ReadingSessionPanel(homeManager: manager);
+        return ReadingSheet(homeManager: manager);
       },
     );
   }

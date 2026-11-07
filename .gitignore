@@ -23,16 +23,21 @@ migrate_working_dir/
 # is commented out by default.
 #.vscode/
 
+# Nix devShell artifacts
+/.nix-flutter-sdk/
+/.pub-cache/
+/.gradle-home/
+
 # Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
+.fvm/
 .flutter-plugins
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
 /build/
-pubspec.lock
 
 # Symbolication related
 app.*.symbols

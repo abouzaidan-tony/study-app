@@ -79,17 +79,21 @@ abstract class AbstractDatabase {
   }
 
   Future<void> _executeSqlBatch(Database db, String sql) async {
+    final batch = db.batch();
+
+    executeSqlBatch(batch, sql);
+
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> executeSqlBatch(Batch batch, String sql) async {
     final statements = sql
         .split(RegExp(r';\s*\n'))
         .where((s) => s.trim().isNotEmpty);
 
-    final batch = db.batch();
-
     for (final statement in statements) {
       batch.execute(statement);
     }
-
-    await batch.commit(noResult: true);
   }
 
   Future<String> createBackup() async {

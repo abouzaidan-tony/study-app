@@ -1,12 +1,10 @@
-import 'dart:io';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:studyapp/l10n/app_localizations.dart';
-import 'package:studyapp/services/common/abstract_database.dart';
-import 'package:studyapp/services/reading_session/rs_manager.dart';
-import 'package:studyapp/services/service_locator.dart';
+import 'package:gbt/l10n/app_localizations.dart';
+import 'package:gbt/services/common/abstract_database.dart';
+import 'package:gbt/services/reading_session/rs_manager.dart';
+import 'package:gbt/services/service_locator.dart';
 
 class BackupRestorePage extends StatefulWidget {
   const BackupRestorePage({super.key});
@@ -68,22 +66,21 @@ class _BackupRestoreState extends State<BackupRestorePage> {
     try {
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
       final bytes = await _readingSessionManager.buildBackupBytes();
-      final targetPath = await FilePicker.platform.saveFile(
+      final targetUri = await FilePicker.saveFile(
         dialogTitle: l10n.chooseBackupLocation,
         fileName: 'reading_session_$timestamp.json',
         bytes: bytes,
-        type: FileType.custom,
-        allowedExtensions: ['json'],
+        mimeType: 'application/json',
       );
 
-      if (targetPath == null) {
+      if (targetUri == null) {
         return;
       }
 
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(l10n.backupExported(targetPath))));
+      ).showSnackBar(SnackBar(content: Text(l10n.backupExported(targetUri.path))));
     } finally {
       if (mounted) {
         setState(() {
@@ -100,26 +97,24 @@ class _BackupRestoreState extends State<BackupRestorePage> {
     });
 
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final files = await FilePicker.pickFiles(
         dialogTitle: l10n.selectBackupFile,
         type: FileType.custom,
         allowedExtensions: ['json'],
-        withData: true,
       );
 
-      if (result == null || result.files.isEmpty) {
+      if (files.isEmpty) {
         return;
       }
 
-      final file = result.files.single;
+      final file = files.single;
       final label = file.name;
 
       if (file.path != null) {
         await _readingSessionManager.restoreBackup(file.path!);
-      } else if (file.bytes != null) {
-        await _readingSessionManager.restoreBackupBytes(file.bytes!);
       } else {
-        throw FileSystemException(l10n.couldNotReadSelectedBackupFile);
+        final bytes = await file.readAsBytes();
+        await _readingSessionManager.restoreBackupBytes(bytes);
       }
 
       await _loadPageData();

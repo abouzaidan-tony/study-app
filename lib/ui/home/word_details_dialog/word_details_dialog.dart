@@ -2,24 +2,20 @@ import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:studyapp/ui/home/common/zoom_wrapper.dart';
-import 'package:studyapp/ui/home/word_details_dialog/similar_verses/similar_verses_page.dart';
-import 'package:studyapp/ui/home/word_details_dialog/dialog_manager.dart';
+import 'package:gbt/ui/common/sparkle_icon.dart';
+import 'package:gbt/ui/home/common/zoom_wrapper.dart';
+import 'package:gbt/ui/home/word_details_dialog/similar_verses/similar_verses_page.dart';
+import 'package:gbt/ui/home/word_details_dialog/dialog_manager.dart';
 
 class WordDetailsDialog extends StatefulWidget {
   const WordDetailsDialog({
     super.key,
     required this.wordId,
     required this.isRtl,
-    required this.onHighlightClick,
-    this.existingHighlightIdx,
   });
 
-  final int wordId;
+  final String wordId;
   final bool isRtl;
-  final int? existingHighlightIdx;
-  final FutureOr<void> Function(int wordId, int? existingHighlightIdx)
-  onHighlightClick;
 
   @override
   State<WordDetailsDialog> createState() => _WordDetailsDialogState();
@@ -33,8 +29,7 @@ class _WordDetailsDialogState extends State<WordDetailsDialog> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final locale = Localizations.localeOf(context);
-    manager.init(locale, widget.wordId);
+    manager.init(widget.wordId);
     // Note: Styles are now defined inside the build method to react to scaling
   }
 
@@ -210,24 +205,12 @@ class _WordDetailsDialogState extends State<WordDetailsDialog> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => SimilarVersesPage(word: wordDetails),
+                builder: (context) =>
+                    SimilarVersesPage(word: wordDetails, wordId: widget.wordId),
               ),
             );
           },
         ),
-        if (widget.existingHighlightIdx != null) const SizedBox(width: 24),
-        if (widget.existingHighlightIdx != null)
-          IconButton(
-            icon: Icon(Icons.edit_off, color: iconColor),
-            onPressed: () async {
-              await widget.onHighlightClick(
-                widget.wordId,
-                widget.existingHighlightIdx,
-              );
-              if (!context.mounted) return;
-              Navigator.of(context).pop();
-            },
-          ),
         const SizedBox(width: 24),
         IconButton(
           icon: AnimatedSwitcher(
@@ -276,11 +259,35 @@ class _WordDetailsDialogState extends State<WordDetailsDialog> {
   }
 
   FittedBox _buildGloss(WordDetails wordDetails, TextStyle style) {
+    if (!wordDetails.glossIsAi) {
+      return FittedBox(
+        child: SelectableText(
+          wordDetails.gloss,
+          textAlign: TextAlign.center,
+          textDirection: wordDetails.glossTextDirection,
+          style: style,
+        ),
+      );
+    }
+
+    final iconSize = style.fontSize ?? 24;
     return FittedBox(
-      child: SelectableText(
-        wordDetails.gloss,
-        textAlign: TextAlign.center,
-        style: style,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        textDirection: wordDetails.glossTextDirection,
+        children: [
+          SparkleIconWidget(
+            size: iconSize,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          SizedBox(width: iconSize * 0.35),
+          SelectableText(
+            wordDetails.gloss,
+            textAlign: TextAlign.center,
+            textDirection: wordDetails.glossTextDirection,
+            style: style,
+          ),
+        ],
       ),
     );
   }

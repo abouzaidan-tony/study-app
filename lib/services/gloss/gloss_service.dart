@@ -1,98 +1,80 @@
-import 'dart:developer';
-import 'dart:ui';
-
-import 'package:flutter/foundation.dart';
-import 'package:studyapp/l10n/app_localizations.dart';
-import 'package:studyapp/services/resources/remote_asset_service.dart';
-import 'package:studyapp/services/download/cancel_token.dart';
-import 'package:studyapp/services/download/download.dart';
-import 'package:studyapp/services/gloss/english_database.dart';
-import 'package:studyapp/services/gloss/gloss_database.dart';
-import 'package:studyapp/services/service_locator.dart';
-import 'package:studyapp/services/settings/user_settings.dart';
+import 'package:gbt/services/gloss/gloss_database.dart';
+import 'package:gbt/services/resources/resource_service.dart';
+import 'package:gbt/services/service_locator.dart';
+import 'package:gbt/services/settings/user_settings.dart';
 
 class GlossService {
   final _settings = getIt<UserSettings>();
-  final _downloadService = getIt<DownloadService>();
-  final _assetService = getIt<RemoteAssetService>();
+  final _resourceService = getIt<ResourceService>();
 
-  final _englishGlossDb = EnglishDatabase();
-  final _glossDb = GlossDatabase();
+  GlossDatabase? _db;
+  String? _currentLangCode;
+  ResourceLanguage? _currentLanguage;
 
-  Future<void> init() async {
-    await _englishGlossDb.init();
-    final langCode = _settings.locale.languageCode;
-    if (langCode != 'en') {
-      await _glossDb.initDb(langCode);
-    }
-  }
-
-  /// Downloads the gloss database for the given locale.
-  Future<void> downloadGlosses(
-    Locale locale, {
-    ValueChanged<double>? onProgress,
-    CancelToken? cancelToken,
-  }) async {
-    final langCode = locale.languageCode;
-    final asset = _assetService.getGlossAsset(langCode);
-
-    log('Downloading glosses for $langCode from ${asset.remoteUrl}');
-
-    try {
-      await _downloadService.downloadAsset(
-        asset: asset,
-        onProgress: onProgress,
-        cancelToken: cancelToken,
-      );
-
-      await _glossDb.initDb(langCode);
-      log('Gloss download and initialization successful.');
-    } catch (e) {
-      log('Gloss download failed for $langCode: $e');
-      rethrow;
-    }
-  }
-
-  Future<String?> glossForId({
-    required Locale locale,
-    required int wordId,
-    void Function(Locale)? onDatabaseMissing,
-  }) async {
-    final glossLocale = _settings.locale;
-
-    // 1. If English, use English DB directly
-    if (!_isDownloadableLanguage(glossLocale)) {
-      return await _englishGlossDb.getGloss(wordId);
-    }
-
-    final langCode = glossLocale.languageCode;
-
-    // 2. Check if localized DB exists
-    final dbExists = await _glossDb.glossDbExists(langCode);
-
-    if (dbExists) {
-      // 3. Try to get localized gloss
-      final localizedGloss = await _glossDb.getGloss(langCode, wordId);
-      // Fallback to English if the specific word is missing in the localized DB
-      return localizedGloss ?? await _englishGlossDb.getGloss(wordId);
-    } else {
-      // 4. Trigger UI callback to prompt download
-      onDatabaseMissing?.call(Locale(langCode));
-      // Fallback to English while waiting
-      return await _englishGlossDb.getGloss(wordId);
-    }
-  }
-
-  bool _isDownloadableLanguage(Locale locale) {
-    if (locale.languageCode == 'en') return false;
-    return AppLocalizations.supportedLocales.any(
-      (l) => l.languageCode == locale.languageCode,
+  GlossService() {
+    _resourceService.addResourceChangeListener(
+      ResourceType.gloss,
+      _onGlossResourceChanged,
     );
   }
 
-  Future<bool> glossesExists(Locale selectedLocale) async {
-    final langCode = selectedLocale.languageCode;
-    if (langCode == 'en') return true;
-    return await _glossDb.glossDbExists(langCode);
+  Future<bool> glossesExists(String langCode) async {
+    return _resourceService.resourceExists(ResourceType.gloss, langCode);
+  }
+
+  Future<GlossResult?> glossForId({
+    required String wordId,
+    void Function(String)? onDatabaseMissing,
+  }) async {
+    final langCode = _settings.glossLang;
+
+    // No gloss language chosen yet — there is nothing to look up.
+    if (langCode == null) return null;
+
+    // Ensure the active database matches the current language.
+    if (_currentLangCode != langCode) {
+      try {
+        await _openForLang(langCode);
+      } on ResourceMissingException {
+        onDatabaseMissing?.call(langCode);
+        return null;
+      }
+    }
+
+    final textDirection =
+        _currentLanguage?.textDirection ?? ResourceLanguageTextDirection.ltr;
+    return _db!.getGloss(wordId, textDirection);
+  }
+
+  Future<void> _openForLang(String langCode) async {
+    final path = await _resourceService.getResourceLocalPath(
+      ResourceType.gloss,
+      langCode,
+    );
+    final language = await _resourceService.getLanguageForResource(
+      ResourceType.gloss,
+      langCode,
+    );
+
+    await _close();
+
+    _db = await GlossDatabase.open(path);
+    _currentLangCode = langCode;
+    _currentLanguage = language;
+  }
+
+  Future<void> _close() async {
+    if (_db != null) {
+      await _db!.close();
+      _db = null;
+      _currentLangCode = null;
+      _currentLanguage = null;
+    }
+  }
+
+  void _onGlossResourceChanged(ResourceType type, String id) {
+    if (_currentLangCode == null || id == _currentLangCode) {
+      _close();
+    }
   }
 }

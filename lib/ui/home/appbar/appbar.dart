@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:studyapp/l10n/book_names.dart';
-import 'package:studyapp/services/app_guide/global_rect.dart';
-import 'package:studyapp/ui/home/appbar/reading_session_timer_view.dart';
+import 'package:gbt/l10n/book_names.dart';
+import 'package:gbt/services/app_guide/global_rect.dart';
+import 'package:gbt/services/resources/resource_service.dart';
+import 'package:gbt/services/service_locator.dart';
+import 'package:gbt/ui/home/appbar/reading_session_timer_view.dart';
 import 'reference_chooser/reference_chooser.dart';
 
 class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -43,6 +45,21 @@ class HomeAppBar extends StatelessWidget implements PreferredSizeWidget {
     return AppBar(
       centerTitle: false,
       titleSpacing: 0,
+      leading: ValueListenableBuilder<OutdatedResourceCounts>(
+        valueListenable: getIt<ResourceService>().outdatedResourceCounts,
+        builder: (context, counts, _) {
+          return Badge(
+            isLabelVisible: counts.total > 0,
+            backgroundColor: Colors.orange,
+            alignment: const Alignment(0.2, -0.5),
+            child: IconButton(
+              icon: const Icon(Icons.menu),
+              tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+          );
+        },
+      ),
       title: ReferenceChooser(
         key: referenceChooserKey,
         currentBookName: bookNameFromId(context, displayBookId),

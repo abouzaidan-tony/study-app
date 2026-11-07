@@ -1,8 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:studyapp/l10n/app_localizations.dart';
-import 'package:studyapp/services/reading_session/rs_manager.dart';
+import 'package:gbt/l10n/app_localizations.dart';
+import 'package:gbt/services/reading_session/rs_manager.dart';
 
 class ReadingSessionOverlay extends StatelessWidget {
   const ReadingSessionOverlay({super.key, required this.manager});
@@ -17,7 +17,7 @@ class ReadingSessionOverlay extends StatelessWidget {
         return ValueListenableBuilder(
           valueListenable: manager.displayGoalProgresNotifier,
           builder: (context, displayGoalProgress, _) {
-            final dailyGoal = manager.getDailyGoal();
+            final dailyGoal = manager.getReadingPlan()?.dailyGoal;
             late final Widget child;
             if (!readingModeEnabled || dailyGoal == null) {
               child = const SizedBox.shrink(key: ValueKey('hidden'));
@@ -65,7 +65,7 @@ class ReadingSessionOverlay extends StatelessWidget {
                   child: ClipRect(
                     child: SizeTransition(
                       axis: Axis.horizontal,
-                      axisAlignment: axisAlignment,
+                      alignment: Alignment(axisAlignment, 0),
                       sizeFactor: animation,
                       child: child,
                     ),

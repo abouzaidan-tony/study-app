@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:scripture/scripture.dart';
-import 'package:studyapp/common/reference.dart';
-import 'package:studyapp/common/word.dart';
-import 'package:studyapp/services/bible/bible_service.dart';
-import 'package:studyapp/services/bookmarks/bookmark_database.dart';
-import 'package:studyapp/services/bookmarks/bookmark_model.dart';
-import 'package:studyapp/services/hebrew_greek/database.dart';
-import 'package:studyapp/services/service_locator.dart';
+import 'package:gbt/common/reference.dart';
+import 'package:gbt/common/word.dart';
+import 'package:gbt/services/bible/bible_service.dart';
+import 'package:gbt/services/bookmarks/bookmark_database.dart';
+import 'package:gbt/services/bookmarks/bookmark_model.dart';
+import 'package:gbt/services/hebrew_greek/database.dart';
+import 'package:gbt/services/service_locator.dart';
 
 class BookmarkInformation {
   Bookmark bookmark;

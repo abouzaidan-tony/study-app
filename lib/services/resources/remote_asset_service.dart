@@ -1,5 +1,4 @@
-import 'package:studyapp/l10n/app_languages.dart';
-import 'package:studyapp/services/files/file_service.dart'; // Import your FileType enum
+import 'package:gbt/services/files/file_service.dart'; // Import your FileType enum
 
 class RemoteAsset {
   final String remoteUrl;
@@ -16,36 +15,21 @@ class RemoteAsset {
 }
 
 class RemoteAssetService {
-  static const String _baseHost = "https://assets.globalbibletools.com";
+  /// Override at build time for the target:
+  ///
+  ///   * Android emulator:   --dart-define=ASSETS_BASE_URL=http://10.0.2.2:4566/assets
+  ///   * iOS simulator:       --dart-define=ASSETS_BASE_URL=http://localhost:4566/assets
+  ///   * Physical device:     --dart-define=ASSETS_BASE_URL=http://YOUR_LAN_IP:4566/assets
+  ///
+  /// Defaults to the production asset server.
+  static const String _baseHost = String.fromEnvironment(
+    'ASSETS_BASE_URL',
+    defaultValue: 'https://assets.globalbibletools.com',
+  );
 
-  // --- BIBLE ASSETS ---
-
-  /// Returns the asset config for a specific language bible database.
-  /// Example: remote: .../bibles/spa_blm.db.zip -> local: spa_blm.db
-  RemoteAsset getBibleAsset(String langCode) {
-    final filename = AppLanguages.getConfig(langCode).bibleFilename;
-
-    return RemoteAsset(
-      remoteUrl: '$_baseHost/bibles/v1/$filename.zip',
-      localRelativePath: filename,
-      fileType: FileType.bible,
-      isZip: true,
-    );
-  }
-
-  // --- GLOSS ASSETS ---
-
-  /// Returns the asset config for a gloss database.
-  RemoteAsset getGlossAsset(String langCode) {
-    final filename = AppLanguages.getConfig(langCode).glossFilename;
-
-    return RemoteAsset(
-      remoteUrl: '$_baseHost/glosses/v1/$filename.zip',
-      localRelativePath: filename,
-      fileType: FileType.gloss,
-      isZip: true,
-    );
-  }
+  /// Public accessor for the resolved asset base URL, used when constructing
+  /// manifest URLs (e.g. by [ResourceService.refresh]).
+  String get baseHost => _baseHost;
 
   // --- AUDIO ASSETS ---
 

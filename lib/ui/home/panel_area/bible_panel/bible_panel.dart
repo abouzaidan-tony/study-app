@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:studyapp/services/settings/user_settings.dart';
-import 'package:studyapp/ui/home/panel_area/common/infinite_scroll_view.dart';
-import 'package:studyapp/ui/home/common/scroll_sync_controller.dart';
-import 'package:studyapp/ui/home/common/zoom_wrapper.dart';
+import 'package:gbt/services/settings/user_settings.dart';
+import 'package:gbt/ui/home/panel_area/common/infinite_scroll_view.dart';
+import 'package:gbt/ui/home/common/scroll_sync_controller.dart';
+import 'package:gbt/ui/home/common/zoom_wrapper.dart';
 import 'bible_chapter.dart';
 import 'bible_panel_manager.dart';
 
@@ -14,6 +14,7 @@ class BiblePanel extends StatefulWidget {
     this.syncController,
     required this.settingsVersion,
     this.scrollingEnabled = true,
+    this.onResourceUnavailable,
   });
 
   final int bookId;
@@ -21,6 +22,7 @@ class BiblePanel extends StatefulWidget {
   final ScrollSyncController? syncController;
   final int settingsVersion;
   final bool scrollingEnabled;
+  final VoidCallback? onResourceUnavailable;
 
   @override
   State<BiblePanel> createState() => BiblePanelState();
@@ -77,6 +79,8 @@ class BiblePanelState extends State<BiblePanel> {
                         chapter: ch,
                         fontSize: fontSize,
                         verseLayout: verseLayout,
+                        settingsVersion: widget.settingsVersion,
+                        onResourceUnavailable: widget.onResourceUnavailable,
                       );
                     },
                   ),

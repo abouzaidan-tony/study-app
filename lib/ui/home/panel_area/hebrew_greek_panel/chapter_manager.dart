@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:studyapp/app_state.dart';
-import 'package:studyapp/common/word.dart';
-import 'package:studyapp/services/bible/bible_service.dart';
-import 'package:studyapp/services/bookmarks/bookmark_database.dart';
-import 'package:studyapp/services/bookmarks/bookmark_model.dart';
-import 'package:studyapp/services/download/cancel_token.dart';
-import 'package:studyapp/services/gloss/gloss_service.dart';
-import 'package:studyapp/services/hebrew_greek/database.dart';
-import 'package:studyapp/services/reading_session/rs_manager.dart';
-import 'package:studyapp/services/service_locator.dart';
-import 'package:studyapp/services/settings/user_settings.dart';
+import 'package:gbt/common/word.dart';
+import 'package:gbt/services/gloss/gloss_service.dart';
+import 'package:gbt/services/bookmarks/bookmark_database.dart';
+import 'package:gbt/services/bookmarks/bookmark_model.dart';
+import 'package:gbt/services/hebrew_greek/database.dart';
+import 'package:gbt/services/reading_session/rs_manager.dart';
+import 'package:gbt/services/service_locator.dart';
+import 'package:gbt/services/settings/user_settings.dart';
+import 'package:gbt/ui/common/resource_language_text_direction.dart';
+import 'package:gbt/ui/home/panel_area/hebrew_greek_panel/text.dart';
 
 class HighlightDetail {
   Highlight highlight;
@@ -51,7 +50,6 @@ class HighlightDetail {
 class HebrewGreekChapterManager {
   final _hebrewGreekDb = getIt<HebrewGreekDatabase>();
   final _glossService = getIt<GlossService>();
-  final _bibleService = getIt<BibleService>();
   final _settings = getIt<UserSettings>();
   final _rsmanager = getIt<ReadingSessionManager>();
   final _bookmarkDb = getIt<BookmarksDatabase>();
@@ -62,8 +60,7 @@ class HebrewGreekChapterManager {
   final highlightedWords = _SafeValueNotifier<List<HighlightDetail>>([]);
   final highlighModeEnabled = ValueNotifier<bool>(false);
   final temporaryHighlightIdx = ValueNotifier<int?>(null);
-
-  int? activeHighlightAnchorWordId;
+  WordRenderer? activeHighlightAnchorWordId;
   bool _disposed = false;
   int _chapterLoadToken = 0;
   int _readVersesLoadToken = 0;
@@ -81,10 +78,15 @@ class HebrewGreekChapterManager {
   }
 
   Future<void> loadReadVerses(int bookId, int chapter) async {
+    final readingPlan = _rsmanager.getReadingPlan();
+
+    if (readingPlan == null) return;
+
     final token = ++_readVersesLoadToken;
     if (_disposed) return;
     verseCheckboxNotifier.clear();
     final versesRead = await _rsmanager.getVersesReadForChapter(
+      readingPlan.readingPlan.id!,
       bookId,
       chapter,
     );
@@ -157,10 +159,15 @@ class HebrewGreekChapterManager {
   }
 
   Future<void> markVerseAsRead(int bookId, int chapter, int verse) async {
+    final readingPlan = _rsmanager.getReadingPlan();
+
+    if (readingPlan == null) return;
+
     if (_disposed) return;
     await _rsmanager.markVerseAsRead(bookId, chapter, verse);
     if (_disposed) return;
     final versesRead = await _rsmanager.getVersesReadForChapter(
+      readingPlan.readingPlan.id!,
       bookId,
       chapter,
     );
@@ -169,10 +176,15 @@ class HebrewGreekChapterManager {
   }
 
   Future<void> resetVerseProgress(int bookId, int chapter, int verse) async {
+    final readingPlan = _rsmanager.getReadingPlan();
+
+    if (readingPlan == null) return;
+
     if (_disposed) return;
     await _rsmanager.resetReadingCountForVerse(bookId, chapter, verse);
     if (_disposed) return;
     final versesRead = await _rsmanager.getVersesReadForChapter(
+      readingPlan.readingPlan.id!,
       bookId,
       chapter,
     );
@@ -185,80 +197,30 @@ class HebrewGreekChapterManager {
     return bookId <= malachi;
   }
 
-  Future<String?> getPopupTextForId(
-    Locale uiLocale,
-    int wordId,
-    void Function(Locale)? onGlossDownloadNeeded,
+  Future<WordPopup?> getPopupTextForId(
+    String wordId,
+    void Function(String)? onGlossDownloadNeeded,
   ) async {
-    return _glossService.glossForId(
-      locale: uiLocale,
+    final gloss = await _glossService.glossForId(
       wordId: wordId,
       onDatabaseMissing: onGlossDownloadNeeded,
     );
+    if (gloss == null || gloss.gloss.isEmpty) return null;
+    return WordPopup(
+      text: gloss.gloss,
+      isAiGenerated: gloss.isAiGenerated,
+      textDirection: gloss.textDirection.toTextDirection,
+    );
   }
 
-  // Called from the UI when user agrees to download.
-  Future<void> downloadResources(
-    Locale locale, {
-    required ValueNotifier<double> progressNotifier,
-    required CancelToken cancelToken,
-  }) async {
-    // Reuse the exact same logic as SettingsManager
-    // 1. Determine tasks
-    final needGloss = !await _glossService.glossesExists(locale);
-    final needBible = !await _bibleService.bibleExists(locale);
-
-    int tasksToRun = (needGloss ? 1 : 0) + (needBible ? 1 : 0);
-    int tasksCompleted = 0;
-
-    void updateProgress(double fileProgress) {
-      if (tasksToRun == 0) {
-        progressNotifier.value = 1.0;
-        return;
-      }
-      final overall =
-          (tasksCompleted / tasksToRun) + (fileProgress / tasksToRun);
-      progressNotifier.value = overall;
-    }
-
-    // 2. Glosses
-    if (needGloss) {
-      if (cancelToken.isCancelled) return;
-      await _glossService.downloadGlosses(
-        locale,
-        cancelToken: cancelToken,
-        onProgress: updateProgress,
-      );
-      tasksCompleted++;
-    }
-
-    // 3. Bible
-    if (needBible) {
-      if (cancelToken.isCancelled) return;
-      updateProgress(0.0);
-      await _bibleService.downloadBible(
-        locale,
-        cancelToken: cancelToken,
-        onProgress: updateProgress,
-      );
-      tasksCompleted++;
-    }
-
-    progressNotifier.value = 1.0;
-  }
-
-  // Called from the UI when user wants to use English instead of downloading.
-  Future<void> setLanguageToEnglish(Locale originalLocale) async {
-    await _settings.setLocale('en');
-    getIt<AppState>().init();
+  Future<void> unsetGlossLang() async {
+    await _settings.setGlossLang(null);
   }
 
   String getVerseText(int verse) {
     if (_disposed) return '';
     final words = textNotifier.value;
-    final verseWords = words
-        .where((w) => (w.id ~/ 100) % 1000 == verse)
-        .toList();
+    final verseWords = words.where((w) => w.reference.verse == verse).toList();
 
     if (verseWords.isEmpty) return '';
 

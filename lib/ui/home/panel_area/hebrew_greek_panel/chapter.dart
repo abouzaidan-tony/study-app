@@ -1,20 +1,24 @@
 import 'dart:async';
-import 'dart:math';
+import 'dart:math' hide log;
+import 'dart:developer' show log;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:studyapp/common/book_name.dart';
-import 'package:studyapp/common/word.dart';
-import 'package:studyapp/services/bookmarks/bookmark_model.dart';
-import 'package:studyapp/services/reading_session/rs_manager.dart';
-import 'package:studyapp/theme.dart' show darkPickerColors, lightPickerColors;
-import 'package:studyapp/ui/common/resource_ui_helper.dart';
-import 'package:studyapp/services/settings/user_settings.dart';
-import 'package:studyapp/ui/home/panel_area/common/infinite_scroll_view.dart';
-import 'package:studyapp/ui/home/common/scroll_sync_controller.dart';
-import 'package:studyapp/ui/home/panel_area/hebrew_greek_panel/chapter_manager.dart';
-import 'package:studyapp/ui/home/panel_area/hebrew_greek_panel/text.dart';
-import 'package:studyapp/ui/home/verse_selection_dialog/verse_selection_dialog.dart';
-import 'package:studyapp/ui/home/word_details_dialog/word_details_dialog.dart';
+import 'package:gbt/common/book_name.dart';
+import 'package:gbt/common/reference.dart';
+import 'package:gbt/common/word.dart';
+import 'package:gbt/services/bookmarks/bookmark_model.dart';
+import 'package:gbt/services/reading_session/rs_manager.dart';
+import 'package:gbt/theme.dart' show darkPickerColors, lightPickerColors;
+import 'package:gbt/services/resources/resource.dart';
+import 'package:gbt/services/service_locator.dart';
+import 'package:gbt/ui/common/resource_ui_helper.dart';
+import 'package:gbt/services/settings/user_settings.dart';
+import 'package:gbt/ui/home/home_manager.dart';
+import 'package:gbt/ui/home/panel_area/common/infinite_scroll_view.dart';
+import 'package:gbt/ui/home/common/scroll_sync_controller.dart';
+import 'package:gbt/ui/home/panel_area/hebrew_greek_panel/chapter_manager.dart';
+import 'package:gbt/ui/home/panel_area/hebrew_greek_panel/text.dart';
+import 'package:gbt/ui/home/verse_selection_dialog/verse_selection_dialog.dart';
 
 class VerseNumberTapNotification extends Notification {
   final int bookId;
@@ -37,6 +41,7 @@ class HebrewGreekChapter extends StatefulWidget {
     required this.fontSize,
     required this.verseLayout,
     required this.readingModeEnabled,
+    required this.highlightNotifier,
     this.syncController,
     this.onReadingCheckboxGuideRectChanged,
     this.onReadingCheckboxGuideCompleted,
@@ -50,6 +55,7 @@ class HebrewGreekChapter extends StatefulWidget {
   final ScrollSyncController? syncController;
   final ValueChanged<Rect?>? onReadingCheckboxGuideRectChanged;
   final VoidCallback? onReadingCheckboxGuideCompleted;
+  final ValueNotifier<Reference?> highlightNotifier;
 
   @override
   State<HebrewGreekChapter> createState() => HebrewGreekChapterState();
@@ -159,6 +165,13 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
     return _textController.getVerseForOffset(yOffset);
   }
 
+  ValueNotifier<String?>? get _flashedWordIdNotifier {
+    if (getIt.isRegistered<HomeManager>()) {
+      return getIt<HomeManager>().flashedWordIdNotifier;
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -182,22 +195,110 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
           builder: (context, words, child) {
             if (words.isEmpty) return const SizedBox();
 
-            return ValueListenableBuilder<VerseHighlight?>(
-              valueListenable:
-                  widget.syncController?.highlightNotifier ??
-                  ValueNotifier(null),
-              builder: (context, highlightInfo, _) {
+            return ValueListenableBuilder<Reference?>(
+              valueListenable: widget.highlightNotifier,
+              builder: (context, reference, _) {
                 int? verseToHighlight;
-                if (highlightInfo != null &&
-                    highlightInfo.bookId == widget.bookId &&
-                    highlightInfo.chapter == widget.chapter) {
-                  verseToHighlight = highlightInfo.verse;
+                if (reference != null &&
+                    reference.bookId == widget.bookId &&
+                    reference.chapter == widget.chapter) {
+                  verseToHighlight = reference.verse;
                 }
 
                 //always show first verse only (basic logic)
                 final spotlightVerse =
                     widget.onReadingCheckboxGuideRectChanged != null ? 1 : null;
 
+                Widget textWidget(String? flashedWordId) => HebrewGreekText(
+                  key: _hebrewGreekTextKey,
+                  words: words,
+                  verseLayout: widget.verseLayout,
+                  readingModeEnabled: widget.readingModeEnabled,
+                  checkedVerses: checkedVerses,
+                  changedCheckedVerse: changedVerse,
+                  resetCheckedVerses: resetCheckedVerses,
+                  checkedVersesRevision: checkedVersesRevision,
+                  spotlightVerse: spotlightVerse,
+                  bookmarkedVerses: bookmarkedVerses,
+                  highlightedWords: highlightedWords,
+                  highlightModeEnabled: manager.highlighModeEnabled.value,
+                  highlightSelectionAnchorWordId:
+                      manager.activeHighlightAnchorWordId,
+                  onHighlightSelectionStarted: _onHighlightSelectionStarted,
+                  onHighlightSelectionChanged: _onHighlightSelectionChanged,
+                  onHighlightSelectionCompleted: _onHighlightSelectionCompleted,
+                  onHighlightSelectionCanceled: _onHighlightSelectionCanceled,
+                  onHighlightColorSelected: _onHighightColorSelected,
+                  onHighlightSelectionCopy: _onHighightCopy,
+                  highlightPickerColors:
+                      Theme.of(context).brightness == Brightness.dark
+                      ? darkPickerColors
+                      : lightPickerColors,
+                  controller: _textController,
+                  textDirection: manager.isRtl(widget.bookId)
+                      ? TextDirection.rtl
+                      : TextDirection.ltr,
+                  textStyle: TextStyle(fontSize: widget.fontSize),
+                  verseNumberStyle: TextStyle(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontSize: widget.fontSize * 0.7,
+                  ),
+                  onVerseNumberTap: (verse) {
+                    VerseNumberTapNotification(
+                      bookId: widget.bookId,
+                      chapter: widget.chapter,
+                      verse: verse,
+                    ).dispatch(context);
+                  },
+                  onVerseCheckboxTap: (verse) async {
+                    if (widget.onReadingCheckboxGuideCompleted != null) {
+                      widget.onReadingCheckboxGuideCompleted!.call();
+                      return;
+                    }
+
+                    int count = checkedVerses[verse] ?? 0;
+                    if (count < ReadingSessionManager.maximumReadCount) {
+                      await manager.markVerseAsRead(
+                        widget.bookId,
+                        widget.chapter,
+                        verse,
+                      );
+                    } else {
+                      await manager.resetVerseProgress(
+                        widget.bookId,
+                        widget.chapter,
+                        verse,
+                      );
+                    }
+                  },
+                  onVerseNumberLongPress: (verse) {
+                    final isBookmarked = bookmarkedVerses.contains(verse);
+                    _showVerseSelectionDialog(verse, isBookmarked);
+                  },
+                  popupBackgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.inverseSurface,
+                  popupTextStyle: TextStyle(
+                    fontFamily: 'sbl',
+                    fontSize: widget.fontSize * 0.7,
+                    color: Theme.of(context).colorScheme.onInverseSurface,
+                  ),
+                  popupWordProvider: (wordId) {
+                    return manager.getPopupTextForId(
+                      wordId,
+                      (langCode) => _handleMissingGloss(langCode),
+                    );
+                  },
+                  onPopupShown: _ensurePopupIsVisible,
+                  onWordLongPress: _showWordDetails,
+                  flashedWordId: flashedWordId,
+                  highlightedVerse: verseToHighlight,
+                  highlightColor: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.25),
+                );
+
+                final flashNotifier = _flashedWordIdNotifier;
                 return Padding(
                   padding: const EdgeInsets.only(left: 16.0, right: 16.0),
                   child: Column(
@@ -208,99 +309,13 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
                         style: TextStyle(fontSize: 30),
                       ),
                       const SizedBox(height: 10),
-                      HebrewGreekText(
-                        key: _hebrewGreekTextKey,
-                        words: words,
-                        verseLayout: widget.verseLayout,
-                        readingModeEnabled: widget.readingModeEnabled,
-                        checkedVerses: checkedVerses,
-                        changedCheckedVerse: changedVerse,
-                        resetCheckedVerses: resetCheckedVerses,
-                        checkedVersesRevision: checkedVersesRevision,
-                        spotlightVerse: spotlightVerse,
-                        bookmarkedVerses: bookmarkedVerses,
-                        highlightedWords: highlightedWords,
-                        highlightModeEnabled: manager.highlighModeEnabled.value,
-                        highlightSelectionAnchorWordId:
-                            manager.activeHighlightAnchorWordId,
-                        onHighlightSelectionStarted:
-                            _onHighlightSelectionStarted,
-                        onHighlightSelectionChanged:
-                            _onHighlightSelectionChanged,
-                        onHighlightSelectionCompleted:
-                            _onHighlightSelectionCompleted,
-                        onHighlightSelectionCanceled:
-                            _onHighlightSelectionCanceled,
-                        onHighlightColorSelected: _onHighightColorSelected,
-                        onHighlightSelectionCopy: _onHighightCopy,
-                        highlightPickerColors:
-                            Theme.of(context).brightness == Brightness.dark
-                            ? darkPickerColors
-                            : lightPickerColors,
-                        controller: _textController,
-                        textDirection: manager.isRtl(widget.bookId)
-                            ? TextDirection.rtl
-                            : TextDirection.ltr,
-                        textStyle: TextStyle(fontSize: widget.fontSize),
-                        verseNumberStyle: TextStyle(
-                          color: Theme.of(context).colorScheme.primary,
-                          fontSize: widget.fontSize * 0.7,
-                        ),
-                        onVerseNumberTap: (verse) {
-                          VerseNumberTapNotification(
-                            bookId: widget.bookId,
-                            chapter: widget.chapter,
-                            verse: verse,
-                          ).dispatch(context);
-                        },
-                        onVerseCheckboxTap: (verse) async {
-                          if (widget.onReadingCheckboxGuideCompleted != null) {
-                            widget.onReadingCheckboxGuideCompleted!.call();
-                            return;
-                          }
-
-                          int count = checkedVerses[verse] ?? 0;
-                          if (count < ReadingSessionManager.maximumReadCount) {
-                            await manager.markVerseAsRead(
-                              widget.bookId,
-                              widget.chapter,
-                              verse,
-                            );
-                          } else {
-                            await manager.resetVerseProgress(
-                              widget.bookId,
-                              widget.chapter,
-                              verse,
-                            );
-                          }
-                        },
-                        onVerseNumberLongPress: (verse) {
-                          final isBookmarked = bookmarkedVerses.contains(verse);
-                          _showVerseSelectionDialog(verse, isBookmarked);
-                        },
-                        popupBackgroundColor: Theme.of(
-                          context,
-                        ).colorScheme.inverseSurface,
-                        popupTextStyle: TextStyle(
-                          fontFamily: 'sbl',
-                          fontSize: widget.fontSize * 0.7,
-                          color: Theme.of(context).colorScheme.onInverseSurface,
-                        ),
-                        popupWordProvider: (wordId) {
-                          final locale = Localizations.localeOf(context);
-                          return manager.getPopupTextForId(
-                            locale,
-                            wordId,
-                            (locale) => _handleMissingResources(locale),
-                          );
-                        },
-                        onPopupShown: _ensurePopupIsVisible,
-                        onWordLongPress: _showWordDetails,
-                        highlightedVerse: verseToHighlight,
-                        highlightColor: Theme.of(
-                          context,
-                        ).colorScheme.primary.withValues(alpha: 0.25),
-                      ),
+                      flashNotifier != null
+                          ? ValueListenableBuilder<String?>(
+                              valueListenable: flashNotifier,
+                              builder: (context, flashedWordId, _) =>
+                                  textWidget(flashedWordId),
+                            )
+                          : textWidget(null),
                     ],
                   ),
                 );
@@ -368,40 +383,29 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
     });
   }
 
-  Future<void> _handleMissingResources(Locale locale) async {
+  Future<void> _handleMissingGloss(String langCode) async {
     // Use the shared helper logic
-    final success = await ResourceUIHelper.ensureResources(context, locale);
+    final success = await ResourceUIHelper.ensureResource(
+      context,
+      ResourceType.gloss,
+      langCode,
+    );
 
     if (!success && mounted) {
       // If they clicked "Cancel" or download failed,
       // tell the manager to stop trying to load localized glosses
       // for this session so they aren't prompted on every single tap.
-      manager.setLanguageToEnglish(locale);
+      manager.unsetGlossLang();
     } else if (success && mounted) {
       // Refresh the UI so the words show the newly downloaded glosses
       setState(() {});
     }
   }
 
-  Future<void> _showWordDetails(int wordId) async {
-    int? existingHighlightIdx;
-
-    for (int i = 0; i < manager.highlightedWords.value.length; i++) {
-      Highlight h = manager.highlightedWords.value[i].highlight;
-      if (wordId >= h.fromWord && wordId <= h.toWord) {
-        existingHighlightIdx = i;
-        break;
-      }
-    }
-
-    await showDialog(
-      context: context,
-      builder: (context) => WordDetailsDialog(
-        wordId: wordId,
-        isRtl: manager.isRtl(widget.bookId),
-        onHighlightClick: _onHighlightClick,
-        existingHighlightIdx: existingHighlightIdx,
-      ),
+  Future<void> _showWordDetails(String wordId) async {
+    getIt<HomeManager>().startWordStudy(
+      wordId: wordId,
+      isRtl: manager.isRtl(widget.bookId),
     );
   }
 
@@ -430,20 +434,26 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
     manager.deleteBookmark(widget.bookId, widget.chapter, verse);
   }
 
-  void _onHighlightSelectionStarted(int fromWordId, int toWordId) async {
+  void _onHighlightSelectionStarted(
+    WordRenderer fromWord,
+    WordRenderer toWord,
+  ) async {
     final highlights = _setActiveHighlightRange(
-      fromWordId,
-      toWordId,
+      int.parse(fromWord.word.id),
+      int.parse(toWord.word.id),
       createIfMissing: true,
     );
 
+    manager.activeHighlightAnchorWordId = fromWord;
     manager.highlighModeEnabled.value = true;
-    manager.activeHighlightAnchorWordId = fromWordId;
 
     await manager.saveHighlights(highlights);
   }
 
-  Future<void> _onHighlightClick(int wordId, int? existingHighlightIdx) async {
+  Future<void> _onHighlightClick(
+    WordRenderer wordr,
+    int? existingHighlightIdx,
+  ) async {
     if (existingHighlightIdx != null) {
       List<HighlightDetail> highlights = List.of(
         manager.highlightedWords.value,
@@ -456,19 +466,35 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
       manager.highlightedWords.value = highlights;
       return;
     }
+
+    manager.activeHighlightAnchorWordId = wordr;
+    manager.highlighModeEnabled.value = true;
+
+    final highlights = _setActiveHighlightRange(
+      int.parse(wordr.word.id),
+      int.parse(wordr.word.id),
+      createIfMissing: true,
+    );
+    await manager.saveHighlights(highlights);
   }
 
-  void _onHighlightSelectionChanged(int fromWordId, int toWordId) {
-    _setActiveHighlightRange(fromWordId, toWordId);
+  void _onHighlightSelectionChanged(
+    WordRenderer fromWord,
+    WordRenderer toWord,
+  ) {
+    _setActiveHighlightRange(
+      int.parse(fromWord.word.id),
+      int.parse(toWord.word.id),
+    );
   }
 
   Future<void> _onHighlightSelectionCompleted(
-    int fromWordId,
-    int toWordId,
+    WordRenderer fromWord,
+    WordRenderer toWord,
   ) async {
     final highlights = _setActiveHighlightRange(
-      fromWordId,
-      toWordId,
+      int.parse(fromWord.word.id),
+      int.parse(toWord.word.id),
       isActive: false,
     );
     _finishHighlightSelection();
