@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' hide log;
-import 'dart:developer' show log;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gbt/common/book_name.dart';
@@ -447,34 +446,6 @@ class HebrewGreekChapterState extends State<HebrewGreekChapter>
     manager.activeHighlightAnchorWordId = fromWord;
     manager.highlighModeEnabled.value = true;
 
-    await manager.saveHighlights(highlights);
-  }
-
-  Future<void> _onHighlightClick(
-    WordRenderer wordr,
-    int? existingHighlightIdx,
-  ) async {
-    if (existingHighlightIdx != null) {
-      List<HighlightDetail> highlights = List.of(
-        manager.highlightedWords.value,
-      );
-      Highlight h = highlights[existingHighlightIdx].highlight;
-      highlights.removeAt(existingHighlightIdx);
-      if (h.id != null) {
-        await manager.deleteHighlight(h.id!);
-      }
-      manager.highlightedWords.value = highlights;
-      return;
-    }
-
-    manager.activeHighlightAnchorWordId = wordr;
-    manager.highlighModeEnabled.value = true;
-
-    final highlights = _setActiveHighlightRange(
-      int.parse(wordr.word.id),
-      int.parse(wordr.word.id),
-      createIfMissing: true,
-    );
     await manager.saveHighlights(highlights);
   }
 
