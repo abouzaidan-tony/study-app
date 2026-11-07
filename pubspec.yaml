@@ -35,6 +35,9 @@ dependencies:
   flutter_markdown_plus: ^1.0.7
   wakelock_plus: ^1.5.1
 
+dependency_overrides:
+  path_provider_foundation: 2.5.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -43,6 +46,8 @@ dev_dependencies:
   sqflite_common_ffi: ^2.4.5
 
 flutter:
+  config:
+    enable-swift-package-manager: false
   uses-material-design: true
   generate: true # needed for generating localization files
   fonts:
