@@ -191,5 +191,6 @@ abstract class AbstractDatabase {
 
   void dispose() {
     database.close();
+    _initFuture = null;
   }
 }
